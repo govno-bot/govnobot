@@ -1,10 +1,64 @@
 # GovnoBot
 
-A Telegram bot built with PowerShell that integrates with Ollama for AI-powered responses.
+A Telegram AI bot with Ollama integration - now being rewritten in Node.js!
 
 ## Overview
 
-GovnoBot is a Telegram chatbot that provides access to local AI models through Ollama integration. The bot is written in PowerShell and includes comprehensive deployment and management tools.
+GovnoBot is a Telegram chatbot that provides access to local AI models through Ollama integration. Originally written in PowerShell, it's being rewritten in **pure Node.js** (zero external dependencies) following TDD/BDD/ADD methodology for better cross-platform support and maintainability.
+
+## 🚀 Node.js Rewrite (In Progress)
+
+The Node.js version is currently under development following a test-driven approach. See [govnoplan.node.md](govnoplan.node.md) for the complete development plan.
+
+### Current Status
+
+✅ Phase 1.1: Test infrastructure setup  
+🔄 Phase 1.2: Core utility modules (chunker, logger, file-lock)  
+⏳ Phase 2: Storage & persistence  
+⏳ Phase 3-8: Security, Telegram API, AI integration, commands
+
+### Quick Start (Node.js Version)
+
+```bash
+# 1. Bootstrap the project structure
+node init.js
+# Creates directories, organizes files, runs tests
+
+# 2. Run the demo to see it working
+node demo.js
+# Shows chunker and config modules in action
+
+# 3. Check current status
+npm run status
+# Visual overview of progress
+
+# 4. Run tests
+npm test
+# 20 tests should pass ✅
+
+# 5. Configure your bot (when ready)
+cp .env.example .env
+# Edit .env with your Telegram bot token
+```
+
+### What's Been Implemented?
+
+**✅ Phase 1.1 Complete - Test Infrastructure:**
+- Custom test runner (zero dependencies!)
+- Message chunker (4096 char limit handling)
+- Configuration module (.env parser)
+- 20 passing tests (100% TDD coverage)
+- Complete project scaffolding
+- 8 documentation files
+
+**🔄 Phase 1.2 Next - Core Utilities:**
+- Logger module (structured logging)
+- File lock module (concurrent access)
+- Error handler (graceful recovery)
+
+See [INDEX.md](INDEX.md) for complete overview and [TODO.md](TODO.md) for roadmap.
+
+## PowerShell Version (Legacy)
 
 ## Features
 

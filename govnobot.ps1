@@ -1,7 +1,44 @@
 ﻿# GovnoBot - Telegram Bot for ultimate vibecoding experience.
 # Experimental project
-# Version: 2.2.6
+# Version: 2.4.6
 #
+# Changelog v2.4.6 (2026-01-08):
+# - 🎯 Turn-based controls: Buttons disabled when not player's turn; player X cannot move for O
+# - 💾 State persistence: TTT game state saved to JSON files to survive crashes/restarts
+# - 🔄 Cron-ready: State loads/saves automatically on each poll cycle (NoLoop compatible)
+# - 🎮 Win/draw messages: Both players now receive final game result properly
+#
+# Changelog v2.4.5 (2026-01-08):
+# - 🎮 Tic-Tac-Toe: Global game list (array) with simple Join/New flow
+# - 👥 Cross-chat PvP: Players can join from their own chats; both sides receive edits
+# - 🧭 Simpler UX: Show Join button if a free game exists, otherwise New Game
+# - 🧹 Removed group-chat requirement hints; per-player message tracking added
+# - 🔧 UTF-8 Fix: Replaced emoji literals with Unicode escape sequences to prevent encoding issues
+#
+# Changelog v2.4.3 (2026-01-08):
+# - 🩹 Robustness: Guard edit-in-place with runtime check; fallback to send to avoid errors if function isn’t loaded in a running instance
+# - ✨ UX: /ttt now edits the existing board message when possible (no extra duplicates)
+#
+# Changelog v2.4.2 (2026-01-08):
+# - 🧹 Tic-Tac-Toe: Edit-in-place board updates via `editMessageText` (reduced spam)
+# - 🧭 Cleaner UX: Reuse mode-selection message for the first board render
+# - 🧨 Quit flow: Edits last board to "Game ended" instead of posting a new message
+# - 🔧 Internal: Track per-chat `messageId` to synchronize updates for all players
+#
+# Changelog v2.4.1 (2026-01-07):
+# - 🎮 Feature: Added Tic-Tac-Toe `/ttt` with PvP/AI modes, inline keyboards, and callback handling
+# - 🧾 Admin audit log: Persistent `admin_audit.log` entries for privileged commands
+# - 🛡️ /sh hardening: Strict whitelist, alias mapping, and metacharacter blocking
+# - 🔐 /jack sanitization: Safe parameterized invocation via `sendMessageToJack.ps1`
+# - 🔧 Minor improvements: Help text updates and callback response resilience
+#
+# Changelog v2.3.1 (2026-01-05):
+# - 🛡️ Security fix: Prevented admin check output leakage causing unauthorized execution of admin commands
+# - ✅ Suppressed Send-TelegramMessage output in RestrictToAdmin to ensure clean boolean return
+# - 🔄 Applied equivalent hardening to Node.js version (`govnobot.js`)
+#
+# Changelog v2.3.0 (2026-01-01):
+# - Added "NoLoop" flag, so the script is possible to call by cron/scheduler
 # Changelog v2.2.6 (2025-12-31):
 # - Restrict all potentialy harmful commands to be accesseble by Admin only
 # Changelog v2.2.5 (2025-12-31):
@@ -73,19 +110,32 @@ param(
     [int]$BotAdminChatId = $env:TELEGRAM_GOVNOBOT_ADMIN_CHATID,
     [int]$PollInterval = 30,
     [switch]$NoLamma,
+    [switch]$NoLoop,
     [switch]$Debug
 )
 
 # Version info
-$script:Version = "2.2.6"
-$script:VersionDate = "2025-12-31"
+$script:Version = "2.4.6"
+$script:VersionDate = "2026-01-08"
 
 # Configuration
 $script:LastUpdateId = 0
-# Note: it is possible to use MacBook ip adress to use ollama
-$script:OllamaUrl = "http://localhost:11434/api/generate"
-$script:OllamaModel = "llama2"
-$script:AvailableModels = @("llama2", "mistral", "neural-chat", "dolphin-mixtral")
+# Emojis map for encoding-safe usage
+$script:E = @{
+    Game = [char]::ConvertFromUtf32(0x1F3AE)
+    Bot = [char]::ConvertFromUtf32(0x1F916)
+    Tile = [char]0x2B1C
+    X = [char]0x274C
+    Refresh = [char]::ConvertFromUtf32(0x1F504)
+    Plus = [char]0x2795
+    Handshake = [char]::ConvertFromUtf32(0x1F91D)
+    Tada = [char]::ConvertFromUtf32(0x1F389)
+    Users = [char]::ConvertFromUtf32(0x1F465)
+    Hourglass = [char]0x23F3
+    Gear = [char]0x2699
+    NoEntry = [char]::ConvertFromUtf32(0x1F6AB)
+    Warn = [char]0x26A0
+}
 
 # Persistence paths
 $script:DataDirectory = Join-Path $PSScriptRoot "govnobot_data"
@@ -99,6 +149,15 @@ if (-not (Test-Path $script:DataDirectory)) {
     New-Item -ItemType Directory -Path $script:HistoryDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $script:SettingsDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $script:CacheDirectory -Force | Out-Null
+}
+
+# Load Tic-Tac-Toe subsystem
+$tttModulePath = Join-Path $PSScriptRoot "tickTackToe.prompt.ps1"
+if (Test-Path $tttModulePath) { 
+    $content = Get-Content $tttModulePath -Encoding UTF8 -Raw
+    Invoke-Expression $content
+    # Load persisted game state
+    $null = Load-TicTacToeState
 }
 
 # Statistics
@@ -533,17 +592,51 @@ function RestrictToAdmin {
     )
     
     $username = $Message.from.username
-    $chatId = $Message.chat.id
-    
-    if ($BotAdminUserName -eq $username) {
-        if ($BotAdminChatId -eq $chatId) {
+    $chatId = [long]$Message.chat.id
+
+    # Normalize for comparison
+    $adminUserConfigured = -not [string]::IsNullOrWhiteSpace($BotAdminUserName)
+    $adminChatConfigured = $BotAdminChatId -ne $null -and $BotAdminChatId -ne 0
+
+    $isAdminByUser = $false
+    $isAdminByChat = $false
+
+    if ($adminUserConfigured -and $username) {
+        $isAdminByUser = ($BotAdminUserName.ToLower() -eq $username.ToLower())
+    }
+    if ($adminChatConfigured) {
+        $isAdminByChat = ($BotAdminChatId -eq $chatId)
+    }
+
+    # Grant admin only when configured criteria match
+    if ($adminUserConfigured -and $adminChatConfigured) {
+        if ($isAdminByUser -and $isAdminByChat) {
+            Write-Log "Admin access granted for @$username (chat: $chatId)" "INFO"
+            return $true
+        }
+    } elseif ($adminUserConfigured) {
+        if ($isAdminByUser) {
+            Write-Log "Admin access granted for @$username (chat: $chatId)" "INFO"
+            return $true
+        }
+    } elseif ($adminChatConfigured) {
+        if ($isAdminByChat) {
             Write-Log "Admin access granted for @$username (chat: $chatId)" "INFO"
             return $true
         }
     }
-    
-    Write-Log "Access denied for @$username (chat: $chatId)" "WARN"
-    Send-TelegramMessage -ChatId $chatId -Text "⛔ Access denied. This command is restricted to administrators."
+
+    # If no admin is configured at all, deny by default for safety
+    if (-not $adminUserConfigured -and -not $adminChatConfigured) {
+        Write-Log "Admin restrictions active but no admin configured; denying access for @$username (chat: $chatId)" "WARN"
+    } else {
+        Write-Log "Access denied for @$username (chat: $chatId)" "WARN"
+    }
+
+    # IMPORTANT: suppress function output from Send-TelegramMessage to avoid
+    # leaking pipeline output that would make callers see a non-empty array
+    # and incorrectly treat admin check as passed.
+    $null = Send-TelegramMessage -ChatId $chatId -Text "⛔ Access denied. This command is restricted to administrators."
     return $false
 }
 
@@ -554,6 +647,10 @@ function Invoke-Shell-Command {
     )
     try {
         Write-Log "Executing shell command: $ShellCommand" "DEBUG"
+        if (-not (Validate-AdminCommand -Command $ShellCommand)) {
+            Write-Log "Blocked disallowed admin command: $ShellCommand" "WARN"
+            return "⚠️ Command not allowed. Use permitted admin commands only."
+        }
         
         $output = Invoke-Expression $ShellCommand 2>&1 | Out-String
         
@@ -566,6 +663,48 @@ function Invoke-Shell-Command {
     catch {
         Write-Log "Shell command execution failed: $_" "ERROR"
         return "Error executing command: $_"
+    }
+}
+
+function Validate-AdminCommand {
+    param([Parameter(Mandatory=$true)][string]$Command)
+    # Disallow dangerous metacharacters
+    $disallowed = @('`', ';', '|', '&&', '&', '>', '<')
+    foreach ($sym in $disallowed) {
+        if ($Command -like "*${sym}*") { return $false }
+    }
+
+    $token = ($Command.Trim() -split '\s+')[0]
+    $allowed = @(
+        'Get-Process', 'Get-Service', 'Get-ChildItem', 'Get-Item',
+        'Get-Content', 'Test-Path', 'whoami', 'hostname', 'ipconfig'
+    )
+
+    # Map common aliases
+    switch ($token.ToLower()) {
+        'dir' { $token = 'Get-ChildItem' }
+        'ls'  { $token = 'Get-ChildItem' }
+        'cat' { $token = 'Get-Content' }
+        default { }
+    }
+
+    return $allowed -contains $token
+}
+
+function Log-AdminAction {
+    param(
+        [Parameter(Mandatory=$true)][string]$Username,
+        [Parameter(Mandatory=$true)][long]$ChatId,
+        [Parameter(Mandatory=$true)][string]$Command
+    )
+    try {
+        $auditFile = Join-Path $script:DataDirectory "admin_audit.log"
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $entry = "[$timestamp] @$Username ($ChatId): $Command"
+        Add-Content -Path $auditFile -Value $entry
+    }
+    catch {
+        Write-Log "Failed to write admin audit entry: $_" "WARN"
     }
 }
 
@@ -637,6 +776,7 @@ function Invoke-Telegram-Command {
         "/history [n] - Show last n messages (default: 5)`n" +
         "/model [name] - Switch AI model (llama2, mistral, neural-chat)`n" +
         "/settings - Show your settings`n" +
+        "/ttt - Play Tic-Tac-Toe`n" +
         "/sh [command] - Execute shell command (admin)`n" +
         "/jack [text] - Sends a message to Jack via Facebook (admin)`n" +
         "/dev - Self-improvement mode (admin)`n" +
@@ -708,7 +848,9 @@ function Invoke-Telegram-Command {
         "^/status" {
             $uptime = (Get-Date) - $script:Stats.StartTime
             $uptimeStr = "{0:dd}d {0:hh}h {0:mm}m" -f $uptime
-            
+            if ($NoLoop) {
+                $uptimeStr = 'N/A NoLoop flag is set'
+            }
             # Check Ollama status
             $ollamaStatus = "❌ Not connected"
             if (-not $NoLamma) {
@@ -745,13 +887,90 @@ function Invoke-Telegram-Command {
             
             Send-TelegramMessage -ChatId $chatId -Text $statusText
         }
-                
-        "^/ask" {
-            if (-not (RestrictToAdmin -Message $Message)) {
-                Send-TelegramMessage -ChatId $chatId -Text "For Admins only"
-                Write-Log "For Admins only"
+        
+        "^/ttt" {
+            $tttArg = $text -replace "^/ttt\s*", ""
+            $userId = [long]$Message.from.id
+            $userName = $Message.from.username
+
+            # If user has an active game, show it
+            $existing = Find-UserActiveGame -UserId $userId
+            if (-not $tttArg) {
+                if ($existing -and -not $existing.gameOver) {
+                    $boardText = Format-TicTacToeBoard -Board $existing.board
+                    $kb = Get-TicTacToeKeyboard -Board $existing.board -GameOver $false -Game $existing
+                    $curLabel = $existing.currentPlayer
+                    if ($existing.mode -eq 'pvp') {
+                        if ($curLabel -eq 'X' -and $existing.XUserName) { $curLabel = "X (@$($existing.XUserName))" }
+                        if ($curLabel -eq 'O' -and $existing.OUserName) { $curLabel = "O (@$($existing.OUserName))" }
+                    }
+                    $msg = "$script:TTT_GAME **Tic-Tac-Toe**`nCurrent Player: **$curLabel**`n`n$boardText"
+                    $mid = $null
+                    $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
+                    if ($existing.XUserId -eq $userId) { $mid = $existing.XMessageId } elseif ($existing.OUserId -eq $userId) { $mid = $existing.OMessageId }
+                    if ($mid -and $canEdit) {
+                        $null = Edit-TelegramMessage -ChatId $chatId -MessageId ([int]$mid) -Text $msg -ReplyMarkup $kb
+                    } else {
+                        $resp = Send-TelegramMessage -ChatId $chatId -Text $msg -ReplyMarkup $kb
+                        try {
+                            if ($resp -and $resp.ok -and $resp.result) {
+                                if ($existing.XUserId -eq $userId) { $existing.XMessageId = [int]$resp.result.message_id } elseif ($existing.OUserId -eq $userId) { $existing.OMessageId = [int]$resp.result.message_id }
+                            }
+                        } catch { }
+                    }
+                    return
+                }
+                # Lobby: show Join if free game exists, otherwise New Game
+                $free = Find-JoinableGame -RequesterUserId $userId
+                if ($free) {
+                    $row = @(@{ text = "$script:TTT_PLUS Join Game"; callback_data = "ttt_join_any" })
+                    $kb = @{ inline_keyboard = @(,$row) }
+                    Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_GAME Tic-Tac-Toe`nJoin available game:" -ReplyMarkup $kb
+                } else {
+                    $row = @(@{ text = "$script:TTT_REFRESH New Game"; callback_data = "ttt_new_pvp" })
+                    $kb = @{ inline_keyboard = @(,$row) }
+                    Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_GAME Tic-Tac-Toe`nStart a new game:" -ReplyMarkup $kb
+                }
                 return
             }
+            $mode = $null
+            if ($tttArg -match "^ai$") { $mode = 'ai' }
+            elseif ($tttArg -match "^pvp$") { $mode = 'pvp' }
+            if (-not $mode) {
+                # Default: show lobby options
+                $free = Find-JoinableGame -RequesterUserId $userId
+                if ($free) {
+                    $row = @(@{ text = "$script:TTT_PLUS Join Game"; callback_data = "ttt_join_any" })
+                    $kb = @{ inline_keyboard = @(,$row) }
+                    Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_GAME Tic-Tac-Toe`nJoin available game:" -ReplyMarkup $kb
+                } else {
+                    $row = @(@{ text = "$script:TTT_REFRESH New Game"; callback_data = "ttt_new_pvp" })
+                    $kb = @{ inline_keyboard = @(,$row) }
+                    Send-TelegramMessage -ChatId $chatId -Text "Usage: /ttt [pvp|ai]" -ReplyMarkup $kb
+                }
+                return
+            }
+            # Start new game explicitly
+            $game = Initialize-TicTacToeGame -Mode $mode -CreatorUserId $userId -CreatorUserName $userName -CreatorChatId $chatId
+            $boardText = Format-TicTacToeBoard -Board $game.board
+            $kb = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game
+            $curLabel = $game.currentPlayer
+            if ($game.mode -eq 'pvp') {
+                if ($curLabel -eq 'X' -and $game.XUserName) { $curLabel = "X (@$($game.XUserName))" }
+                if ($curLabel -eq 'O' -and $game.OUserName) { $curLabel = "O (@$($game.OUserName))" }
+            }
+            $msg = "$script:TTT_GAME **Tic-Tac-Toe**`nCurrent Player: **$curLabel**`n`n$boardText"
+            $resp = Send-TelegramMessage -ChatId $chatId -Text $msg -ReplyMarkup $kb
+            try { if ($resp -and $resp.ok -and $resp.result) { $game.XMessageId = [int]$resp.result.message_id } } catch { }
+        }
+                
+        "^/ask" {
+            $isAdmin = RestrictToAdmin -Message $Message
+            if (-not $isAdmin) {
+                Write-Log "Ask command is For Admins only"
+                return
+            }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/ask"
 
             $question = $text -replace "^/ask\s*", ""
             if (-not $question) {
@@ -852,6 +1071,7 @@ function Invoke-Telegram-Command {
                 Write-Log "For Admins only"
                 return
             }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/fix"
             
             # Check rate limit
             $rateLimitCheck = Check-RateLimit -ChatId $chatId
@@ -933,6 +1153,7 @@ function Invoke-Telegram-Command {
                 Write-Log "For Admins only"
                 return
             }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/chain"
 
             $chainPrompt = $text -replace "^/chain\s*", ""
             if (-not $chainPrompt) {
@@ -1031,6 +1252,7 @@ function Invoke-Telegram-Command {
             if (-not (RestrictToAdmin -Message $Message)) {
                 return
             }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/agent"
             
             Send-TelegramMessage -ChatId $chatId -Text "🤖 Starting agent session...`n`nTask: $agentPrompt"
             
@@ -1071,12 +1293,20 @@ function Invoke-Telegram-Command {
                 Write-Log "For Admins only"
                 return
             }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/jack"
 
             $message = $text -replace "^/jack\s*", ""
             if ($message -and $message.Length -gt 0) {
                 try {
-                    $command = ".\sendMessageToJack.ps1 '" + $message + "'";
-                    $result = Invoke-Shell-Command -ShellCommand $command
+                    # Sanitize message to avoid command injection and malformed input
+                    $sanitized = ($message -replace "[\r\n]", " ").Trim()
+                    $jackScript = Join-Path (Split-Path $PSScriptRoot) "sendMessageToJack.ps1"
+                    if (Test-Path $jackScript) {
+                        $result = & $jackScript -Message $sanitized
+                    } else {
+                        # Fallback to current working directory
+                        $result = & "${PSScriptRoot}\..\sendMessageToJack.ps1" -Message $sanitized
+                    }
                     $resultText = "Message sent. Probably."
                     if (-not $result) {
                         $resultText = "Something went wrong."
@@ -1102,10 +1332,13 @@ function Invoke-Telegram-Command {
             if (-not (RestrictToAdmin -Message $Message)) {
                 return
             }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/sh"
             
             $shCommand = $text -replace "^/sh\s*", ""
             if (-not $shCommand) {
-                Send-TelegramMessage -ChatId $chatId -Text "Usage: /sh [your command]`n`nExample: /sh ls`n`n/sh dir"
+                $allowedList = "Get-Process, Get-Service, Get-ChildItem, Get-Item, Get-Content, Test-Path, whoami, hostname, ipconfig"
+                Send-TelegramMessage -ChatId $chatId -Text ("Usage: /sh [your command]`n`n" +
+                    "Allowed: " + $allowedList)
                 return
             }
             $result = Invoke-Shell-Command -ShellCommand $shCommand
@@ -1258,6 +1491,7 @@ function Invoke-Telegram-Command {
             if (-not (RestrictToAdmin -Message $Message)) {
                 return
             }
+            Log-AdminAction -Username $username -ChatId $chatId -Command "/dev"
             
             Send-TelegramMessage -ChatId $chatId -Text "[Dev] Triggering self-improvement process..."
             Write-Log "Self-improvement triggered by @$username"
@@ -1295,17 +1529,173 @@ function Invoke-Callback-Query {
     
     Write-Log "Processing callback '$callbackData' from @$username (chat: $chatId)"
     
-    # Answer callback query to remove loading state
+    # Answer callback query to remove loading state (basic ack)
     try {
         $answerUrl = "$script:BaseUrl/answerCallbackQuery"
         $answerBody = @{
             callback_query_id = $queryId
         } | ConvertTo-Json
-        Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json" -Body $answerBody | Out-Null
+        Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $answerBody | Out-Null
     }
     catch {
         Write-Log "Failed to answer callback query: $_" "WARN"
     }    
+
+    if ($callbackData -eq 'ttt_new_pvp' -or $callbackData -eq 'ttt_new_ai') {
+        $mode = if ($callbackData -eq 'ttt_new_pvp') { 'pvp' } else { 'ai' }
+        $uid = [long]$CallbackQuery.from.id
+        $uname = $CallbackQuery.from.username
+        if (-not $uname -or $uname -eq "") { $uname = "user$uid" }
+        $game = Initialize-TicTacToeGame -Mode $mode -CreatorUserId $uid -CreatorUserName $uname -CreatorChatId $chatId
+        $boardText = Format-TicTacToeBoard -Board $game.board
+        $kb = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game
+        $curLabel = $game.currentPlayer
+        if ($game.mode -eq 'pvp') {
+            if ($curLabel -eq 'X' -and $game.XUserName) { $curLabel = "X (@$($game.XUserName))" }
+            if ($curLabel -eq 'O' -and $game.OUserName) { $curLabel = "O (@$($game.OUserName))" }
+        }
+        $msg = "$script:TTT_GAME **Tic-Tac-Toe**`nCurrent Player: **$curLabel**`n`n$boardText"
+        $originMsgId = [int]$CallbackQuery.message.message_id
+        $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
+        if ($canEdit) {
+            $null = Edit-TelegramMessage -ChatId $chatId -MessageId $originMsgId -Text $msg -ReplyMarkup $kb
+            $game.XMessageId = $originMsgId
+        } else {
+            $resp = Send-TelegramMessage -ChatId $chatId -Text $msg -ReplyMarkup $kb
+            try { if ($resp -and $resp.ok -and $resp.result) { $game.XMessageId = [int]$resp.result.message_id } } catch { }
+        }
+        return
+    }
+    if ($callbackData -match '^ttt_move_(\d+)_(\d+)$') {
+        $gameId = [int]$matches[1]
+        $pos = [int]$matches[2]
+        $uid = [long]$CallbackQuery.from.id
+        $uname = $CallbackQuery.from.username
+        if (-not $uname -or $uname -eq "") { $uname = "user$uid" }
+        $result = Handle-TicTacToeMove -GameId $gameId -Position $pos -UserId $uid -UserName $uname
+        if ($result.success) {
+            $game = $result.game
+            $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
+            
+            # Generate player-specific keyboards
+            $rmX = if ($result.gameOver) { 
+                Get-TicTacToeKeyboard -Board $game.board -GameOver $true -Game $game
+            } else { 
+                Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.XUserId
+            }
+            $rmO = if ($result.gameOver) { 
+                Get-TicTacToeKeyboard -Board $game.board -GameOver $true -Game $game
+            } else { 
+                Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.OUserId
+            }
+            
+            # Edit X side
+            if ($game.XMessageId -and $canEdit) {
+                $null = Edit-TelegramMessage -ChatId $game.XChatId -MessageId ([int]$game.XMessageId) -Text $result.message -ReplyMarkup $rmX
+            } elseif ($game.XChatId) {
+                $respX = Send-TelegramMessage -ChatId $game.XChatId -Text $result.message -ReplyMarkup $rmX
+                try { if ($respX -and $respX.ok -and $respX.result) { $game.XMessageId = [int]$respX.result.message_id } } catch { }
+            }
+            # Edit O side
+            if ($game.OChatId) {
+                if ($game.OMessageId -and $canEdit) {
+                    $null = Edit-TelegramMessage -ChatId $game.OChatId -MessageId ([int]$game.OMessageId) -Text $result.message -ReplyMarkup $rmO
+                } else {
+                    $respO = Send-TelegramMessage -ChatId $game.OChatId -Text $result.message -ReplyMarkup $rmO
+                    try { if ($respO -and $respO.ok -and $respO.result) { $game.OMessageId = [int]$respO.result.message_id } } catch { }
+                }
+            }
+            if ($result.gameOver) {
+                # Remove finished game
+                $script:TicTacToeGames = @($script:TicTacToeGames | Where-Object { $_.id -ne $game.id })
+                Save-TicTacToeState
+            }
+        }
+        else {
+            try {
+                $alertBody = @{
+                    callback_query_id = $queryId
+                    text = $result.message
+                    show_alert = $true
+                } | ConvertTo-Json
+                Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $alertBody | Out-Null
+            }
+            catch {
+                Write-Log "Failed to send callback alert: $_" "WARN"
+            }
+        }
+        return
+    }
+    if ($callbackData -eq 'ttt_join_any') {
+        $uid = [long]$CallbackQuery.from.id
+        $uname = $CallbackQuery.from.username
+        if (-not $uname -or $uname -eq "") { $uname = "user$uid" }
+        $result = Join-TicTacToeAny -UserId $uid -UserName $uname -ChatId $chatId
+        if ($result.success) {
+            $game = $result.game
+            
+            # Generate player-specific keyboards
+            $rmX = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.XUserId
+            $rmO = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.OUserId
+            
+            # Send board to O (this chat)
+            $respO = Send-TelegramMessage -ChatId $chatId -Text $result.message -ReplyMarkup $rmO
+            try { if ($respO -and $respO.ok -and $respO.result) { $game.OMessageId = [int]$respO.result.message_id } } catch { }
+            # Update X side board
+            $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
+            if ($game.XChatId -and $game.XMessageId -and $canEdit) {
+                $null = Edit-TelegramMessage -ChatId $game.XChatId -MessageId ([int]$game.XMessageId) -Text $result.message -ReplyMarkup $rmX
+            } elseif ($game.XChatId) {
+                $respX = Send-TelegramMessage -ChatId $game.XChatId -Text $result.message -ReplyMarkup $rmX
+                try { if ($respX -and $respX.ok -and $respX.result) { $game.XMessageId = [int]$respX.result.message_id } } catch { }
+            }
+        }
+        else {
+            try {
+                $alertBody = @{
+                    callback_query_id = $queryId
+                    text = $result.message
+                    show_alert = $true
+                } | ConvertTo-Json
+                Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $alertBody | Out-Null
+            }
+            catch {
+                Write-Log "Failed to send callback alert: $_" "WARN"
+            }
+        }
+        return
+    }
+    if ($callbackData -eq 'ttt_disabled') {
+        # Silently acknowledge disabled button click (not player's turn)
+        try {
+            $alertBody = @{
+                callback_query_id = $queryId
+            } | ConvertTo-Json
+            Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $alertBody | Out-Null
+        }
+        catch {
+            Write-Log "Failed to acknowledge disabled button: $_" "WARN"
+        }
+        return
+    }
+    if ($callbackData -match '^ttt_quit_(\d+)$') {
+        $gameId = [int]$matches[1]
+        $game = Get-GameById -GameId $gameId
+        if ($game) {
+            $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
+            if ($game.XChatId -and $game.XMessageId -and $canEdit) { $null = Edit-TelegramMessage -ChatId $game.XChatId -MessageId ([int]$game.XMessageId) -Text "$script:TTT_CROSS Game ended." }
+            elseif ($game.XChatId) { Send-TelegramMessage -ChatId $game.XChatId -Text "$script:TTT_CROSS Game ended." | Out-Null }
+            if ($game.OChatId) {
+                if ($game.OMessageId -and $canEdit) { $null = Edit-TelegramMessage -ChatId $game.OChatId -MessageId ([int]$game.OMessageId) -Text "$script:TTT_CROSS Game ended." }
+                else { Send-TelegramMessage -ChatId $game.OChatId -Text "$script:TTT_CROSS Game ended." | Out-Null }
+            }
+            $script:TicTacToeGames = @($script:TicTacToeGames | Where-Object { $_.id -ne $gameId })
+            Save-TicTacToeState
+        } else {
+            Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_CROSS Game ended." | Out-Null
+        }
+        return
+    }
 }
 
 function Start-BotPolling {
@@ -1339,7 +1729,11 @@ function Start-BotPolling {
                     }
                 }
             }
-            
+
+            if ($NoLoop) {
+                Write-Log "NoLoop flag detected. Exiting after single iteration." "INFO"
+                break
+            }
             Start-Sleep -Seconds $PollInterval
         }
         catch {
@@ -1404,4 +1798,36 @@ try {
 catch {
     Write-Log "💥 Fatal error: $_" "ERROR"
     exit 1
+}
+
+function Edit-TelegramMessage {
+    param(
+        [Parameter(Mandatory=$true)]
+        [long]$ChatId,
+        [Parameter(Mandatory=$true)]
+        [int]$MessageId,
+        [Parameter(Mandatory=$true)]
+        [string]$Text,
+        [string]$ParseMode = "Markdown",
+        [object]$ReplyMarkup = $null
+    )
+    try {
+        $body = @{
+            chat_id = $ChatId
+            message_id = $MessageId
+            text = $Text
+            parse_mode = $ParseMode
+        }
+        if ($ReplyMarkup) { $body.reply_markup = $ReplyMarkup }
+        $jsonBody = $body | ConvertTo-Json -Depth 10
+        $response = Invoke-RestMethod -Uri "$script:BaseUrl/editMessageText" `
+            -Method Post `
+            -ContentType "application/json; charset=utf-8" `
+            -Body $jsonBody
+        return $response
+    }
+    catch {
+        Write-Log "Failed to edit message: $_" "ERROR"
+        return $null
+    }
 }
