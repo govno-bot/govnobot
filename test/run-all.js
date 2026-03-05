@@ -67,7 +67,7 @@ class TestRunner {
       
       if (stat.isDirectory() && item !== 'mocks' && item !== 'fixtures') {
         files.push(...this.findTestFiles(fullPath));
-      } else if (stat.isFile() && item.endsWith('.test.js'      node send-admin-report.js "Your report text here"      node send-admin-report.js "Your report text here")) {
+      } else if (stat.isFile() && item.endsWith('.test.js')) {
         files.push(fullPath);
       }
     }

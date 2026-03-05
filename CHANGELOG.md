@@ -4,6 +4,17 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.1.0] - 2026-03-05 - User Onboarding Flow
+
+### ✅ Added - User Onboarding
+- Developed `/start` command response with welcome message and usage instructions.
+- Developed `/help` command output listing all available commands and model options.
+- Implemented robust error handling and command routing for `/start` and `/help`.
+- Added strict TDD/BDD tests for onboarding flow (`test/unit/onboarding.test.js`).
+- Dynamic admin/user help message differentiation.
+
+---
+
 ## [Node.js 1.0.0-alpha] - 2025-12-31 - Phase 1.1 Complete
 
 ### 🎉 Major: Node.js Rewrite Initiated
