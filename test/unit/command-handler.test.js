@@ -9,7 +9,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: '1.0.0' };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, {});
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null);
       // Simulate admin user
       await handler.handle({ message: { text: '/sh echo test', from: { id: 1, username: 'admin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('test'), 'Should return shell output for /sh as admin');
@@ -23,7 +23,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: '1.0.0' };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, {});
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null);
       // Simulate non-admin user
       await handler.handle({ message: { text: '/sh echo test', from: { id: 2, username: 'notadmin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('restricted'), 'Should return admin error for /sh as non-admin');
@@ -37,7 +37,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: '1.0.0' };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, {});
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null);
       await handler.handle({ message: { text: '/agent hello world', from: { id: 1, username: 'admin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('Prompt received'), 'Should echo prompt for /agent as admin');
     });
@@ -50,7 +50,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: '1.0.0' };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, {});
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null);
       await handler.handle({ message: { text: '/agent hello world', from: { id: 2, username: 'notadmin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('restricted'), 'Should return admin error for /agent as non-admin');
     });
@@ -58,7 +58,10 @@ module.exports.run = async function(runner) {
   await runner.test('registers and routes public commands', async () => {
     const CommandHandler = require('../../src/commands/command-handler');
     let called = false;
-    const handler = new CommandHandler({}, {}, {}, {});
+    const mockLogger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
+    const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
+    const mockClient = { sendMessage: async () => {}, sendChatAction: async () => {} };
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null);
     handler.registerPublicCommand('test', () => { called = true; });
     await handler.handle({ message: { text: '/test', from: { id: 1 }, chat: { id: 1 } } });
     runner.assert(called, 'Handler should be called for /test');
@@ -67,22 +70,43 @@ module.exports.run = async function(runner) {
   await runner.test('registers and routes admin commands', async () => {
     const CommandHandler = require('../../src/commands/command-handler');
     let called = false;
-    const handler = new CommandHandler({}, {}, {}, {});
+    const mockLogger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
+    const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
+    const mockClient = { sendMessage: async () => {}, sendChatAction: async () => {} };
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null);
     handler.registerAdminCommand('admin', () => { called = true; });
     // Simulate admin user
-    await handler.handle({ message: { text: '/admin', from: { id: 42 }, chat: { id: 1 } } }, true);
+    await handler.handle({ message: { text: '/admin', from: { id: 42, username: 'admin' }, chat: { id: 1 } } });
     runner.assert(called, 'Admin handler should be called for /admin');
   });
 
   await runner.test('returns error for unknown command', async () => {
     const CommandHandler = require('../../src/commands/command-handler');
     let error;
-    const handler = new CommandHandler({}, {}, {}, {});
-    try {
-      await handler.handle({ message: { text: '/unknown', from: { id: 1 }, chat: { id: 1 } } });
-    } catch (e) {
-      error = e;
-    }
-    runner.assert(error, 'Should throw error for unknown command');
+    const mockLogger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
+    const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
+    let sentMsg = null;
+    const mockClient = { sendMessage: async (chatId, msg) => { sentMsg = msg; }, sendChatAction: async () => {} };
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null);
+    
+    await handler.handle({ message: { text: '/unknown', from: { id: 1, username: 'user' }, chat: { id: 1 } } });
+    
+    runner.assert(sentMsg && sentMsg.includes('Unknown command'), 'Should send unknown command message');
+  });
+
+  await runner.test('handles execution errors gracefully', async () => {
+    const CommandHandler = require('../../src/commands/command-handler');
+    const mockLogger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
+    const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
+    let sentMsg = null;
+    const mockClient = { sendMessage: async (chatId, msg) => { sentMsg = msg; }, sendChatAction: async () => {} };
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null);
+    
+    // Register a command that throws an error
+    handler.registerPublicCommand('error', () => { throw new Error('Boom'); });
+    
+    await handler.handle({ message: { text: '/error', from: { id: 1, username: 'user' }, chat: { id: 1 } } });
+    
+    runner.assert(sentMsg && sentMsg.includes('An error occurred processing your command'), 'Should send friendly error message on crash');
   });
 };
