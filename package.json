@@ -1,0 +1,27 @@
+{
+  "name": "govnobot-node",
+  "version": "1.0.0",
+  "description": "Telegram AI Bot (Pure Node.js, Zero Dependencies)",
+  "main": "src/index.js",
+  "scripts": {
+    "init": "node init.js",
+    "bootstrap": "node bootstrap.js",
+    "demo": "node demo.js",
+    "status": "node status.js",
+    "test": "node test/run-all.js",
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "ai",
+    "ollama",
+    "no-dependencies"
+  ],
+  "author": "osmirnov",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

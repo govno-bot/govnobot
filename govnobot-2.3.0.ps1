@@ -1,51 +1,6 @@
 ﻿# GovnoBot - Telegram Bot for ultimate vibecoding experience.
 # Experimental project
-# Version: 2.4.7
-#
-# Changelog v2.4.7 (2026-01-08):
-# - 🔧 Fixed Invoke-AI-Fallback to properly capture AI responses from all sources
-# - 🛡️ Enhanced command validation with comprehensive dangerous pattern detection
-# - 📊 Improved response caching with automatic cleanup and age-based expiration
-# - 🗄️ Added /cache command for cache management (stats, cleanup, clear)
-# - 🔒 Expanded safe command whitelist (network diagnostics, system info, formatting)
-# - ⚡ Added async cache cleanup (1% probability per save to reduce overhead)
-# - 📝 Better logging for cache operations and fallback attempts
-# - ✅ Configurable cache max age via GOVNOBOT_CACHE_HOURS environment variable
-#
-# Changelog v2.4.6 (2026-01-08):
-# - 🎯 Turn-based controls: Buttons disabled when not player's turn; player X cannot move for O
-# - 💾 State persistence: TTT game state saved to JSON files to survive crashes/restarts
-# - 🔄 Cron-ready: State loads/saves automatically on each poll cycle (NoLoop compatible)
-# - 🎮 Win/draw messages: Both players now receive final game result properly
-#
-# Changelog v2.4.5 (2026-01-08):
-# - 🎮 Tic-Tac-Toe: Global game list (array) with simple Join/New flow
-# - 👥 Cross-chat PvP: Players can join from their own chats; both sides receive edits
-# - 🧭 Simpler UX: Show Join button if a free game exists, otherwise New Game
-# - 🧹 Removed group-chat requirement hints; per-player message tracking added
-# - 🔧 UTF-8 Fix: Replaced emoji literals with Unicode escape sequences to prevent encoding issues
-#
-# Changelog v2.4.3 (2026-01-08):
-# - 🩹 Robustness: Guard edit-in-place with runtime check; fallback to send to avoid errors if function isn’t loaded in a running instance
-# - ✨ UX: /ttt now edits the existing board message when possible (no extra duplicates)
-#
-# Changelog v2.4.2 (2026-01-08):
-# - 🧹 Tic-Tac-Toe: Edit-in-place board updates via `editMessageText` (reduced spam)
-# - 🧭 Cleaner UX: Reuse mode-selection message for the first board render
-# - 🧨 Quit flow: Edits last board to "Game ended" instead of posting a new message
-# - 🔧 Internal: Track per-chat `messageId` to synchronize updates for all players
-#
-# Changelog v2.4.1 (2026-01-07):
-# - 🎮 Feature: Added Tic-Tac-Toe `/ttt` with PvP/AI modes, inline keyboards, and callback handling
-# - 🧾 Admin audit log: Persistent `admin_audit.log` entries for privileged commands
-# - 🛡️ /sh hardening: Strict whitelist, alias mapping, and metacharacter blocking
-# - 🔐 /jack sanitization: Safe parameterized invocation via `sendMessageToJack.ps1`
-# - 🔧 Minor improvements: Help text updates and callback response resilience
-#
-# Changelog v2.3.1 (2026-01-05):
-# - 🛡️ Security fix: Prevented admin check output leakage causing unauthorized execution of admin commands
-# - ✅ Suppressed Send-TelegramMessage output in RestrictToAdmin to ensure clean boolean return
-# - 🔄 Applied equivalent hardening to Node.js version (`govnobot.js`)
+# Version: 2.3.0
 #
 # Changelog v2.3.0 (2026-01-01):
 # - Added "NoLoop" flag, so the script is possible to call by cron/scheduler
@@ -125,27 +80,15 @@ param(
 )
 
 # Version info
-$script:Version = "2.4.7"
-$script:VersionDate = "2026-01-08"
+$script:Version = "2.3.0"
+$script:VersionDate = "2025-12-31"
 
 # Configuration
 $script:LastUpdateId = 0
-# Emojis map for encoding-safe usage
-$script:E = @{
-    Game = [char]::ConvertFromUtf32(0x1F3AE)
-    Bot = [char]::ConvertFromUtf32(0x1F916)
-    Tile = [char]0x2B1C
-    X = [char]0x274C
-    Refresh = [char]::ConvertFromUtf32(0x1F504)
-    Plus = [char]0x2795
-    Handshake = [char]::ConvertFromUtf32(0x1F91D)
-    Tada = [char]::ConvertFromUtf32(0x1F389)
-    Users = [char]::ConvertFromUtf32(0x1F465)
-    Hourglass = [char]0x23F3
-    Gear = [char]0x2699
-    NoEntry = [char]::ConvertFromUtf32(0x1F6AB)
-    Warn = [char]0x26A0
-}
+# Note: it is possible to use MacBook ip adress to use ollama
+$script:OllamaUrl = "http://localhost:11434/api/generate"
+$script:OllamaModel = "llama2"
+$script:AvailableModels = @("llama2", "mistral", "neural-chat", "dolphin-mixtral")
 
 # Persistence paths
 $script:DataDirectory = Join-Path $PSScriptRoot "govnobot_data"
@@ -159,15 +102,6 @@ if (-not (Test-Path $script:DataDirectory)) {
     New-Item -ItemType Directory -Path $script:HistoryDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $script:SettingsDirectory -Force | Out-Null
     New-Item -ItemType Directory -Path $script:CacheDirectory -Force | Out-Null
-}
-
-# Load Tic-Tac-Toe subsystem
-$tttModulePath = Join-Path $PSScriptRoot "tickTackToe.prompt.ps1"
-if (Test-Path $tttModulePath) { 
-    $content = Get-Content $tttModulePath -Encoding UTF8 -Raw
-    Invoke-Expression $content
-    # Load persisted game state
-    $null = Load-TicTacToeState
 }
 
 # Statistics
@@ -424,30 +358,23 @@ function Get-CachedResponse {
         [string]$Model
     )
     
-    try {
-        $hash = [System.Security.Cryptography.MD5]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$Model|$Prompt"))
-        $cacheKey = [System.BitConverter]::ToString($hash).Replace("-", "").Substring(0, 16)
-        $cacheFile = Join-Path $script:CacheDirectory "$cacheKey.cache"
-        
-        if (Test-Path $cacheFile) {
-            $cached = Get-Content -Path $cacheFile -Raw | ConvertFrom-Json
-            
-            # Cache valid for 24 hours by default, configurable
-            $cacheMaxAge = if ($env:GOVNOBOT_CACHE_HOURS) { [int]$env:GOVNOBOT_CACHE_HOURS } else { 24 }
+    $hash = [System.Security.Cryptography.MD5]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$Model|$Prompt"))
+    $cacheKey = [System.BitConverter]::ToString($hash).Replace("-", "").Substring(0, 16)
+    $cacheFile = Join-Path $script:CacheDirectory "$cacheKey.cache"
+    
+    if (Test-Path $cacheFile) {
+        try {
+            $cached = Get-Content -Path $cacheFile | ConvertFrom-Json
+            # Cache valid for 24 hours
             $cacheAge = (Get-Date) - [datetime]$cached.timestamp
-            
-            if ($cacheAge.TotalHours -lt $cacheMaxAge) {
-                Write-Log "Cache hit for prompt hash $cacheKey (age: $([math]::Round($cacheAge.TotalHours, 2))h)" "DEBUG"
+            if ($cacheAge.TotalHours -lt 24) {
+                Write-Log "Cache hit for prompt hash $cacheKey" "DEBUG"
                 return $cached.response
-            } else {
-                Write-Log "Cache expired for hash $cacheKey (age: $([math]::Round($cacheAge.TotalHours, 2))h)" "DEBUG"
-                # Clean up expired cache
-                Remove-Item $cacheFile -Force -ErrorAction SilentlyContinue
             }
         }
-    }
-    catch {
-        Write-Log "Failed to read cache: $_" "WARN"
+        catch {
+            Write-Log "Failed to read cache: $_" "WARN"
+        }
     }
     
     return $null
@@ -463,80 +390,20 @@ function Save-CachedResponse {
         [string]$Response
     )
     
+    $hash = [System.Security.Cryptography.MD5]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$Model|$Prompt"))
+    $cacheKey = [System.BitConverter]::ToString($hash).Replace("-", "").Substring(0, 16)
+    $cacheFile = Join-Path $script:CacheDirectory "$cacheKey.cache"
+    
     try {
-        $hash = [System.Security.Cryptography.MD5]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$Model|$Prompt"))
-        $cacheKey = [System.BitConverter]::ToString($hash).Replace("-", "").Substring(0, 16)
-        $cacheFile = Join-Path $script:CacheDirectory "$cacheKey.cache"
-        
         $cacheEntry = @{
             timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-            prompt = $Prompt.Substring(0, [Math]::Min(100, $Prompt.Length))  # Store truncated prompt for debugging
-            model = $Model
             response = $Response
         }
-        $cacheEntry | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheFile -Force -Encoding UTF8
+        $cacheEntry | ConvertTo-Json | Set-Content -Path $cacheFile -Force
         Write-Log "Cached response with hash $cacheKey" "DEBUG"
-        
-        # Periodic cache cleanup (1% chance per save operation to avoid overhead)
-        if ((Get-Random -Minimum 1 -Maximum 100) -eq 1) {
-            Start-Job -ScriptBlock {
-                param($CacheDir, $MaxAgeHours)
-                $cutoffTime = (Get-Date).AddHours(-$MaxAgeHours)
-                Get-ChildItem -Path $CacheDir -Filter "*.cache" | Where-Object {
-                    $_.LastWriteTime -lt $cutoffTime
-                } | Remove-Item -Force
-            } -ArgumentList $script:CacheDirectory, 48 | Out-Null
-        }
     }
     catch {
         Write-Log "Failed to save cache: $_" "WARN"
-    }
-}
-
-function Clear-CacheDirectory {
-    param(
-        [int]$MaxAgeHours = 24,
-        [int]$MaxFiles = 1000
-    )
-    
-    try {
-        Write-Log "Starting cache cleanup (MaxAge: ${MaxAgeHours}h, MaxFiles: $MaxFiles)" "INFO"
-        $cacheFiles = Get-ChildItem -Path $script:CacheDirectory -Filter "*.cache" -ErrorAction SilentlyContinue
-        
-        if (-not $cacheFiles) {
-            Write-Log "No cache files found" "DEBUG"
-            return 0
-        }
-        
-        $removed = 0
-        $cutoffTime = (Get-Date).AddHours(-$MaxAgeHours)
-        
-        # Remove expired files
-        foreach ($file in $cacheFiles) {
-            if ($file.LastWriteTime -lt $cutoffTime) {
-                Remove-Item $file.FullName -Force
-                $removed++
-            }
-        }
-        
-        # If still too many files, remove oldest
-        $remainingFiles = Get-ChildItem -Path $script:CacheDirectory -Filter "*.cache" -ErrorAction SilentlyContinue | 
-            Sort-Object LastWriteTime
-        
-        if ($remainingFiles.Count -gt $MaxFiles) {
-            $toRemove = $remainingFiles.Count - $MaxFiles
-            $remainingFiles | Select-Object -First $toRemove | ForEach-Object {
-                Remove-Item $_.FullName -Force
-                $removed++
-            }
-        }
-        
-        Write-Log "Cache cleanup complete: removed $removed files" "INFO"
-        return $removed
-    }
-    catch {
-        Write-Log "Cache cleanup failed: $_" "ERROR"
-        return 0
     }
 }
 
@@ -669,51 +536,17 @@ function RestrictToAdmin {
     )
     
     $username = $Message.from.username
-    $chatId = [long]$Message.chat.id
-
-    # Normalize for comparison
-    $adminUserConfigured = -not [string]::IsNullOrWhiteSpace($BotAdminUserName)
-    $adminChatConfigured = $BotAdminChatId -ne $null -and $BotAdminChatId -ne 0
-
-    $isAdminByUser = $false
-    $isAdminByChat = $false
-
-    if ($adminUserConfigured -and $username) {
-        $isAdminByUser = ($BotAdminUserName.ToLower() -eq $username.ToLower())
-    }
-    if ($adminChatConfigured) {
-        $isAdminByChat = ($BotAdminChatId -eq $chatId)
-    }
-
-    # Grant admin only when configured criteria match
-    if ($adminUserConfigured -and $adminChatConfigured) {
-        if ($isAdminByUser -and $isAdminByChat) {
-            Write-Log "Admin access granted for @$username (chat: $chatId)" "INFO"
-            return $true
-        }
-    } elseif ($adminUserConfigured) {
-        if ($isAdminByUser) {
-            Write-Log "Admin access granted for @$username (chat: $chatId)" "INFO"
-            return $true
-        }
-    } elseif ($adminChatConfigured) {
-        if ($isAdminByChat) {
+    $chatId = $Message.chat.id
+    
+    if ($BotAdminUserName -eq $username) {
+        if ($BotAdminChatId -eq $chatId) {
             Write-Log "Admin access granted for @$username (chat: $chatId)" "INFO"
             return $true
         }
     }
-
-    # If no admin is configured at all, deny by default for safety
-    if (-not $adminUserConfigured -and -not $adminChatConfigured) {
-        Write-Log "Admin restrictions active but no admin configured; denying access for @$username (chat: $chatId)" "WARN"
-    } else {
-        Write-Log "Access denied for @$username (chat: $chatId)" "WARN"
-    }
-
-    # IMPORTANT: suppress function output from Send-TelegramMessage to avoid
-    # leaking pipeline output that would make callers see a non-empty array
-    # and incorrectly treat admin check as passed.
-    $null = Send-TelegramMessage -ChatId $chatId -Text "⛔ Access denied. This command is restricted to administrators."
+    
+    Write-Log "Access denied for @$username (chat: $chatId)" "WARN"
+    Send-TelegramMessage -ChatId $chatId -Text "⛔ Access denied. This command is restricted to administrators."
     return $false
 }
 
@@ -724,10 +557,6 @@ function Invoke-Shell-Command {
     )
     try {
         Write-Log "Executing shell command: $ShellCommand" "DEBUG"
-        if (-not (Validate-AdminCommand -Command $ShellCommand)) {
-            Write-Log "Blocked disallowed admin command: $ShellCommand" "WARN"
-            return "⚠️ Command not allowed. Use permitted admin commands only."
-        }
         
         $output = Invoke-Expression $ShellCommand 2>&1 | Out-String
         
@@ -743,103 +572,6 @@ function Invoke-Shell-Command {
     }
 }
 
-function Validate-AdminCommand {
-    param([Parameter(Mandatory=$true)][string]$Command)
-    
-    # Disallow dangerous metacharacters and patterns
-    $disallowedPatterns = @(
-        '`',           # Backtick (command substitution)
-        ';',           # Command separator
-        '|',           # Pipeline
-        '&&', '&',     # Command chaining
-        '>', '>>',     # Redirection
-        '<',           # Input redirection
-        '\$\(',        # Subshell $()
-        'Invoke-Expression', 'iex',  # Code execution
-        'Invoke-Command', 'icm',     # Remote execution
-        'Start-Process',             # Process spawning
-        'New-Object.*Net\.WebClient', # Web requests
-        'DownloadString', 'DownloadFile', # Downloads
-        'Remove-Item.*-Recurse',     # Dangerous deletions
-        'Format-Volume',             # Disk operations
-        'Clear-Disk'                 # Disk operations
-    )
-    
-    foreach ($pattern in $disallowedPatterns) {
-        if ($Command -match $pattern) { 
-            Write-Log "Blocked command containing dangerous pattern: $pattern" "WARN"
-            return $false 
-        }
-    }
-
-    # Extract command token
-    $token = ($Command.Trim() -split '\s+')[0]
-    
-    # Whitelist of safe commands
-    $allowed = @(
-        # Safe query commands
-        'Get-Process', 'Get-Service', 'Get-ChildItem', 'Get-Item',
-        'Get-Content', 'Test-Path', 'Get-Location', 'Get-Date',
-        'Get-ComputerInfo', 'Get-TimeZone', 'Get-Culture',
-        
-        # System info (read-only)
-        'whoami', 'hostname', 'ipconfig', 'systeminfo',
-        
-        # Network diagnostics (safe)
-        'Test-Connection', 'Test-NetConnection', 'Resolve-DnsName',
-        
-        # Measurement and statistics
-        'Measure-Object', 'Select-Object', 'Where-Object',
-        
-        # Formatting (safe)
-        'Format-Table', 'Format-List', 'ConvertTo-Json'
-    )
-
-    # Map common aliases to their full cmdlet names
-    $aliasMap = @{
-        'dir' = 'Get-ChildItem'
-        'ls'  = 'Get-ChildItem'
-        'gci' = 'Get-ChildItem'
-        'cat' = 'Get-Content'
-        'gc'  = 'Get-Content'
-        'pwd' = 'Get-Location'
-        'gl'  = 'Get-Location'
-        'gps' = 'Get-Process'
-        'gsv' = 'Get-Service'
-        'ping' = 'Test-Connection'
-    }
-    
-    $normalizedToken = $token
-    if ($aliasMap.ContainsKey($token.ToLower())) {
-        $normalizedToken = $aliasMap[$token.ToLower()]
-    }
-
-    $isAllowed = $allowed -contains $normalizedToken
-    
-    if (-not $isAllowed) {
-        Write-Log "Command not in whitelist: $token (normalized: $normalizedToken)" "WARN"
-    }
-    
-    return $isAllowed
-}
-
-function Log-AdminAction {
-    param(
-        [Parameter(Mandatory=$true)][string]$Username,
-        [Parameter(Mandatory=$true)][long]$ChatId,
-        [Parameter(Mandatory=$true)][string]$Command
-    )
-    try {
-        $auditFile = Join-Path $script:DataDirectory "admin_audit.log"
-        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $entry = "[$timestamp] @$Username ($ChatId): $Command"
-        Add-Content -Path $auditFile -Value $entry
-    }
-    catch {
-        Write-Log "Failed to write admin audit entry: $_" "WARN"
-    }
-}
-
 function Invoke-AI-Fallback {
     param(
         [Parameter(Mandatory=$true)]
@@ -849,127 +581,16 @@ function Invoke-AI-Fallback {
     )
     
     Write-Log "Using NoLamma fallback AI methods for prompt"
-    
-    # Try 1: GitHub agent-task (recommended method)
-    try {
-        Write-Log "Attempting GitHub agent-task..." "DEBUG"
-        $agentOutput = & gh agent-task create $Prompt 2>&1
-        if ($LASTEXITCODE -eq 0 -and $agentOutput) {
-            Write-Log "GitHub agent-task succeeded" "INFO"
-            return @{
-                success = $true
-                answer = $agentOutput -join "`n"
-                source = "GitHub Agent"
-            }
-        }
+    $shellCommand = "code chat '" + $Prompt + "'"    
+    $reuslt = Invoke-Shell-Command -ShellCommand $shellCommand
+    Send-TelegramMessage -ChatId $ChatId -Text "Command is executed. Probably."
+    if ($reuslt) {
+        return @{
+            success = $true
+            message = "Command is executed. Probably."
+        }    
     }
-    catch {
-        Write-Log "GitHub agent-task failed: $_" "DEBUG"
-    }
-    
-    # Try 2: GitHub Copilot CLI
-    try {
-        Write-Log "Attempting GitHub Copilot CLI..." "DEBUG"
-        $copilotPrompt = if ($SystemPrompt -ne "You are a helpful assistant.") {
-            "$SystemPrompt`n`n$Prompt"
-        } else {
-            $Prompt
-        }
-        
-        # Create temp file for prompt to avoid command line escaping issues
-        $tempFile = [System.IO.Path]::GetTempFileName()
-        $copilotPrompt | Set-Content -Path $tempFile -Encoding UTF8
-        
-        $copilotOutput = & copilot explain --file $tempFile 2>&1
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-        
-        if ($LASTEXITCODE -eq 0 -and $copilotOutput) {
-            Write-Log "GitHub Copilot CLI succeeded" "INFO"
-            return @{
-                success = $true
-                answer = $copilotOutput -join "`n"
-                source = "Copilot CLI"
-            }
-        }
-    }
-    catch {
-        Write-Log "GitHub Copilot CLI failed: $_" "DEBUG"
-    }
-    
-    # Try 3: OpenAI API
-    if ($env:OPENAI_API_KEY) {
-        try {
-            Write-Log "Attempting OpenAI API..." "DEBUG"
-            $headers = @{
-                "Authorization" = "Bearer $env:OPENAI_API_KEY"
-                "Content-Type" = "application/json"
-            }
-            
-            $body = @{
-                model = "gpt-3.5-turbo"
-                messages = @(
-                    @{ role = "system"; content = $SystemPrompt }
-                    @{ role = "user"; content = $Prompt }
-                )
-                temperature = 0.7
-                max_tokens = 1000
-            } | ConvertTo-Json -Depth 10
-            
-            $response = Invoke-RestMethod -Uri "https://api.openai.com/v1/chat/completions" `
-                -Method Post `
-                -Headers $headers `
-                -Body $body `
-                -TimeoutSec 30
-            
-            if ($response.choices -and $response.choices.Count -gt 0) {
-                Write-Log "OpenAI API succeeded" "INFO"
-                return @{
-                    success = $true
-                    answer = $response.choices[0].message.content
-                    source = "OpenAI API"
-                }
-            }
-        }
-        catch {
-            Write-Log "OpenAI API failed: $_" "DEBUG"
-        }
-    }
-    
-    # Try 4: VS Code Chat (last resort)
-    try {
-        Write-Log "Attempting VS Code chat command..." "DEBUG"
-        # Use PowerShell's Start-Process to capture output properly
-        $tempOutput = [System.IO.Path]::GetTempFileName()
-        $escapedPrompt = $Prompt -replace "'", "''"
-        
-        Start-Process -FilePath "code" `
-            -ArgumentList "chat", "-m", "agent", "'$escapedPrompt'" `
-            -NoNewWindow `
-            -Wait `
-            -RedirectStandardOutput $tempOutput `
-            -ErrorAction Stop
-        
-        Start-Sleep -Seconds 2  # Give VS Code time to process
-        
-        if (Test-Path $tempOutput) {
-            $vscodeOutput = Get-Content $tempOutput -Raw
-            Remove-Item $tempOutput -Force -ErrorAction SilentlyContinue
-            
-            if ($vscodeOutput -and $vscodeOutput.Trim().Length -gt 0) {
-                Write-Log "VS Code chat command succeeded" "INFO"
-                return @{
-                    success = $true
-                    answer = "Command executed. Check VS Code for results.`n`nPrompt: $Prompt"
-                    source = "VS Code"
-                }
-            }
-        }
-    }
-    catch {
-        Write-Log "VS Code chat command failed: $_" "DEBUG"
-    }
-    
-    # All fallbacks failed
+    # No fallback worked
     return @{ 
         success = $false
         message = "❌ No AI backend available in NoLamma mode.`n`n" +
@@ -1019,8 +640,6 @@ function Invoke-Telegram-Command {
         "/history [n] - Show last n messages (default: 5)`n" +
         "/model [name] - Switch AI model (llama2, mistral, neural-chat)`n" +
         "/settings - Show your settings`n" +
-        "/ttt - Play Tic-Tac-Toe`n" +
-        "/cache - Cache management (admin)`n" +
         "/sh [command] - Execute shell command (admin)`n" +
         "/jack [text] - Sends a message to Jack via Facebook (admin)`n" +
         "/dev - Self-improvement mode (admin)`n" +
@@ -1042,12 +661,12 @@ function Invoke-Telegram-Command {
                 "📅 Release Date: $script:VersionDate`n" +
                 "🧠 AI Model: $script:OllamaModel`n" +
                 "🔗 Ollama URL: $script:OllamaUrl`n`n" +
-                "**Recent Updates (v2.4.7):**`n" +
-                "• ✅ Fixed AI fallback chain to properly capture responses`n" +
-                "• ✅ Enhanced security with comprehensive command validation`n" +
-                "• ✅ Improved caching system with automatic cleanup`n" +
-                "• ✅ Added /cache command for cache management`n" +
-                "• ✅ Expanded safe command whitelist`n`n" +
+                "**Recent Updates:**`n" +
+                "• ✅ Implemented /fix command for debugging`n" +
+                "• ✅ Implemented /agent mode for complex tasks`n" +
+                "• ✅ Added real-time statistics tracking`n" +
+                "• ✅ Improved admin security`n" +
+                "• ✅ Added message chunking for long responses`n`n" +
                 "_Built by AI, for AI_"
             Send-TelegramMessage -ChatId $chatId -Text $versionText
         }
@@ -1131,90 +750,13 @@ function Invoke-Telegram-Command {
             
             Send-TelegramMessage -ChatId $chatId -Text $statusText
         }
-        
-        "^/ttt" {
-            $tttArg = $text -replace "^/ttt\s*", ""
-            $userId = [long]$Message.from.id
-            $userName = $Message.from.username
-
-            # If user has an active game, show it
-            $existing = Find-UserActiveGame -UserId $userId
-            if (-not $tttArg) {
-                if ($existing -and -not $existing.gameOver) {
-                    $boardText = Format-TicTacToeBoard -Board $existing.board
-                    $kb = Get-TicTacToeKeyboard -Board $existing.board -GameOver $false -Game $existing
-                    $curLabel = $existing.currentPlayer
-                    if ($existing.mode -eq 'pvp') {
-                        if ($curLabel -eq 'X' -and $existing.XUserName) { $curLabel = "X (@$($existing.XUserName))" }
-                        if ($curLabel -eq 'O' -and $existing.OUserName) { $curLabel = "O (@$($existing.OUserName))" }
-                    }
-                    $msg = "$script:TTT_GAME **Tic-Tac-Toe**`nCurrent Player: **$curLabel**`n`n$boardText"
-                    $mid = $null
-                    $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
-                    if ($existing.XUserId -eq $userId) { $mid = $existing.XMessageId } elseif ($existing.OUserId -eq $userId) { $mid = $existing.OMessageId }
-                    if ($mid -and $canEdit) {
-                        $null = Edit-TelegramMessage -ChatId $chatId -MessageId ([int]$mid) -Text $msg -ReplyMarkup $kb
-                    } else {
-                        $resp = Send-TelegramMessage -ChatId $chatId -Text $msg -ReplyMarkup $kb
-                        try {
-                            if ($resp -and $resp.ok -and $resp.result) {
-                                if ($existing.XUserId -eq $userId) { $existing.XMessageId = [int]$resp.result.message_id } elseif ($existing.OUserId -eq $userId) { $existing.OMessageId = [int]$resp.result.message_id }
-                            }
-                        } catch { }
-                    }
-                    return
-                }
-                # Lobby: show Join if free game exists, otherwise New Game
-                $free = Find-JoinableGame -RequesterUserId $userId
-                if ($free) {
-                    $row = @(@{ text = "$script:TTT_PLUS Join Game"; callback_data = "ttt_join_any" })
-                    $kb = @{ inline_keyboard = @(,$row) }
-                    Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_GAME Tic-Tac-Toe`nJoin available game:" -ReplyMarkup $kb
-                } else {
-                    $row = @(@{ text = "$script:TTT_REFRESH New Game"; callback_data = "ttt_new_pvp" })
-                    $kb = @{ inline_keyboard = @(,$row) }
-                    Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_GAME Tic-Tac-Toe`nStart a new game:" -ReplyMarkup $kb
-                }
-                return
-            }
-            $mode = $null
-            if ($tttArg -match "^ai$") { $mode = 'ai' }
-            elseif ($tttArg -match "^pvp$") { $mode = 'pvp' }
-            if (-not $mode) {
-                # Default: show lobby options
-                $free = Find-JoinableGame -RequesterUserId $userId
-                if ($free) {
-                    $row = @(@{ text = "$script:TTT_PLUS Join Game"; callback_data = "ttt_join_any" })
-                    $kb = @{ inline_keyboard = @(,$row) }
-                    Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_GAME Tic-Tac-Toe`nJoin available game:" -ReplyMarkup $kb
-                } else {
-                    $row = @(@{ text = "$script:TTT_REFRESH New Game"; callback_data = "ttt_new_pvp" })
-                    $kb = @{ inline_keyboard = @(,$row) }
-                    Send-TelegramMessage -ChatId $chatId -Text "Usage: /ttt [pvp|ai]" -ReplyMarkup $kb
-                }
-                return
-            }
-            # Start new game explicitly
-            $game = Initialize-TicTacToeGame -Mode $mode -CreatorUserId $userId -CreatorUserName $userName -CreatorChatId $chatId
-            $boardText = Format-TicTacToeBoard -Board $game.board
-            $kb = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game
-            $curLabel = $game.currentPlayer
-            if ($game.mode -eq 'pvp') {
-                if ($curLabel -eq 'X' -and $game.XUserName) { $curLabel = "X (@$($game.XUserName))" }
-                if ($curLabel -eq 'O' -and $game.OUserName) { $curLabel = "O (@$($game.OUserName))" }
-            }
-            $msg = "$script:TTT_GAME **Tic-Tac-Toe**`nCurrent Player: **$curLabel**`n`n$boardText"
-            $resp = Send-TelegramMessage -ChatId $chatId -Text $msg -ReplyMarkup $kb
-            try { if ($resp -and $resp.ok -and $resp.result) { $game.XMessageId = [int]$resp.result.message_id } } catch { }
-        }
                 
         "^/ask" {
-            $isAdmin = RestrictToAdmin -Message $Message
-            if (-not $isAdmin) {
-                Write-Log "Ask command is For Admins only"
+            if (-not (RestrictToAdmin -Message $Message)) {
+                Send-TelegramMessage -ChatId $chatId -Text "For Admins only"
+                Write-Log "For Admins only"
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/ask"
 
             $question = $text -replace "^/ask\s*", ""
             if (-not $question) {
@@ -1315,7 +857,6 @@ function Invoke-Telegram-Command {
                 Write-Log "For Admins only"
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/fix"
             
             # Check rate limit
             $rateLimitCheck = Check-RateLimit -ChatId $chatId
@@ -1397,7 +938,6 @@ function Invoke-Telegram-Command {
                 Write-Log "For Admins only"
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/chain"
 
             $chainPrompt = $text -replace "^/chain\s*", ""
             if (-not $chainPrompt) {
@@ -1496,7 +1036,6 @@ function Invoke-Telegram-Command {
             if (-not (RestrictToAdmin -Message $Message)) {
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/agent"
             
             Send-TelegramMessage -ChatId $chatId -Text "🤖 Starting agent session...`n`nTask: $agentPrompt"
             
@@ -1537,20 +1076,12 @@ function Invoke-Telegram-Command {
                 Write-Log "For Admins only"
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/jack"
 
             $message = $text -replace "^/jack\s*", ""
             if ($message -and $message.Length -gt 0) {
                 try {
-                    # Sanitize message to avoid command injection and malformed input
-                    $sanitized = ($message -replace "[\r\n]", " ").Trim()
-                    $jackScript = Join-Path (Split-Path $PSScriptRoot) "sendMessageToJack.ps1"
-                    if (Test-Path $jackScript) {
-                        $result = & $jackScript -Message $sanitized
-                    } else {
-                        # Fallback to current working directory
-                        $result = & "${PSScriptRoot}\..\sendMessageToJack.ps1" -Message $sanitized
-                    }
+                    $command = ".\sendMessageToJack.ps1 '" + $message + "'";
+                    $result = Invoke-Shell-Command -ShellCommand $command
                     $resultText = "Message sent. Probably."
                     if (-not $result) {
                         $resultText = "Something went wrong."
@@ -1576,13 +1107,10 @@ function Invoke-Telegram-Command {
             if (-not (RestrictToAdmin -Message $Message)) {
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/sh"
             
             $shCommand = $text -replace "^/sh\s*", ""
             if (-not $shCommand) {
-                $allowedList = "Get-Process, Get-Service, Get-ChildItem, Get-Item, Get-Content, Test-Path, whoami, hostname, ipconfig"
-                Send-TelegramMessage -ChatId $chatId -Text ("Usage: /sh [your command]`n`n" +
-                    "Allowed: " + $allowedList)
+                Send-TelegramMessage -ChatId $chatId -Text "Usage: /sh [your command]`n`nExample: /sh ls`n`n/sh dir"
                 return
             }
             $result = Invoke-Shell-Command -ShellCommand $shCommand
@@ -1730,80 +1258,25 @@ function Invoke-Telegram-Command {
             Send-TelegramMessage -ChatId $chatId -Text $settingsText
         }
         
-        "^/cache" {
-            # Admin-only command for cache management
-            if (-not (RestrictToAdmin -Message $Message)) {
-                return
-            }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/cache"
-            
-            $cacheArg = $text -replace "^/cache\s*", ""
-            
-            if ($cacheArg -match "^clear$") {
-                Send-TelegramMessage -ChatId $chatId -Text "🗑️ Clearing cache..."
-                $removed = Clear-CacheDirectory -MaxAgeHours 0 -MaxFiles 0
-                Send-TelegramMessage -ChatId $chatId -Text "✅ Cache cleared: removed $removed files"
-            }
-            elseif ($cacheArg -match "^stats$") {
-                $cacheFiles = Get-ChildItem -Path $script:CacheDirectory -Filter "*.cache" -ErrorAction SilentlyContinue
-                if ($cacheFiles) {
-                    $totalSize = ($cacheFiles | Measure-Object -Property Length -Sum).Sum
-                    $sizeMB = [math]::Round($totalSize / 1MB, 2)
-                    $oldest = ($cacheFiles | Sort-Object LastWriteTime | Select-Object -First 1).LastWriteTime
-                    $newest = ($cacheFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
-                    
-                    $statsText = "📊 **Cache Statistics**`n`n" +
-                        "Files: $($cacheFiles.Count)`n" +
-                        "Total Size: ${sizeMB}MB`n" +
-                        "Oldest: $($oldest.ToString('yyyy-MM-dd HH:mm'))`n" +
-                        "Newest: $($newest.ToString('yyyy-MM-dd HH:mm'))`n`n" +
-                        "Use ``/cache clear`` to remove all cached responses."
-                } else {
-                    $statsText = "📊 **Cache Statistics**`n`nCache is empty."
-                }
-                Send-TelegramMessage -ChatId $chatId -Text $statsText
-            }
-            elseif ($cacheArg -match "^cleanup$") {
-                Send-TelegramMessage -ChatId $chatId -Text "🧹 Running cache cleanup..."
-                $removed = Clear-CacheDirectory -MaxAgeHours 24 -MaxFiles 500
-                Send-TelegramMessage -ChatId $chatId -Text "✅ Cleanup complete: removed $removed expired files"
-            }
-            else {
-                $helpText = "🗄️ **Cache Management**`n`n" +
-                    "**Commands:**`n" +
-                    "/cache stats - Show cache statistics`n" +
-                    "/cache cleanup - Remove expired entries (>24h old)`n" +
-                    "/cache clear - Delete all cached responses`n`n" +
-                    "_Cache helps reduce API calls and improves response time._"
-                Send-TelegramMessage -ChatId $chatId -Text $helpText
-            }
-        }
-        
         "^/dev" {
             # Admin-only command for self-improvement
             if (-not (RestrictToAdmin -Message $Message)) {
                 return
             }
-            Log-AdminAction -Username $username -ChatId $chatId -Command "/dev"
             
-            Send-TelegramMessage -ChatId $chatId -Text "🔧 Triggering self-improvement process..."
+            Send-TelegramMessage -ChatId $chatId -Text "[Dev] Triggering self-improvement process..."
             Write-Log "Self-improvement triggered by @$username"
             
             # Check if openVSCodeChat.ps1 exists
             $scriptPath = Join-Path (Split-Path $PSScriptRoot) "openVSCodeChat.ps1"
             if (Test-Path $scriptPath) {
                 & $scriptPath -Prompt "Please read and continue develop govnobot.ps1"
-                Send-TelegramMessage -ChatId $chatId -Text "✅ VS Code chat opened with development prompt"
             } else {
                 Write-Log "openVSCodeChat.ps1 not found at $scriptPath" "WARN"
                 Write-Log "trying to use alternative method"
                 $shellCommand = "code chat -m 'agent' 'Continue developing " + $PSScriptRoot + "\govnobot.ps1 please'"
-                $result = Invoke-Shell-Command -ShellCommand $shellCommand
-                if ($result) {
-                    Send-TelegramMessage -ChatId $chatId -Text "✅ Development command executed"
-                } else {
-                    Send-TelegramMessage -ChatId $chatId -Text "⚠️ Development script not found or failed"
-                }
+                Invoke-Shell-Command -ShellCommand $shellCommand
+                # Send-TelegramMessage -ChatId $chatId -Text "[Warning] Self-improvement script not found"
             }
         }
         default {
@@ -1827,173 +1300,17 @@ function Invoke-Callback-Query {
     
     Write-Log "Processing callback '$callbackData' from @$username (chat: $chatId)"
     
-    # Answer callback query to remove loading state (basic ack)
+    # Answer callback query to remove loading state
     try {
         $answerUrl = "$script:BaseUrl/answerCallbackQuery"
         $answerBody = @{
             callback_query_id = $queryId
         } | ConvertTo-Json
-        Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $answerBody | Out-Null
+        Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json" -Body $answerBody | Out-Null
     }
     catch {
         Write-Log "Failed to answer callback query: $_" "WARN"
     }    
-
-    if ($callbackData -eq 'ttt_new_pvp' -or $callbackData -eq 'ttt_new_ai') {
-        $mode = if ($callbackData -eq 'ttt_new_pvp') { 'pvp' } else { 'ai' }
-        $uid = [long]$CallbackQuery.from.id
-        $uname = $CallbackQuery.from.username
-        if (-not $uname -or $uname -eq "") { $uname = "user$uid" }
-        $game = Initialize-TicTacToeGame -Mode $mode -CreatorUserId $uid -CreatorUserName $uname -CreatorChatId $chatId
-        $boardText = Format-TicTacToeBoard -Board $game.board
-        $kb = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game
-        $curLabel = $game.currentPlayer
-        if ($game.mode -eq 'pvp') {
-            if ($curLabel -eq 'X' -and $game.XUserName) { $curLabel = "X (@$($game.XUserName))" }
-            if ($curLabel -eq 'O' -and $game.OUserName) { $curLabel = "O (@$($game.OUserName))" }
-        }
-        $msg = "$script:TTT_GAME **Tic-Tac-Toe**`nCurrent Player: **$curLabel**`n`n$boardText"
-        $originMsgId = [int]$CallbackQuery.message.message_id
-        $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
-        if ($canEdit) {
-            $null = Edit-TelegramMessage -ChatId $chatId -MessageId $originMsgId -Text $msg -ReplyMarkup $kb
-            $game.XMessageId = $originMsgId
-        } else {
-            $resp = Send-TelegramMessage -ChatId $chatId -Text $msg -ReplyMarkup $kb
-            try { if ($resp -and $resp.ok -and $resp.result) { $game.XMessageId = [int]$resp.result.message_id } } catch { }
-        }
-        return
-    }
-    if ($callbackData -match '^ttt_move_(\d+)_(\d+)$') {
-        $gameId = [int]$matches[1]
-        $pos = [int]$matches[2]
-        $uid = [long]$CallbackQuery.from.id
-        $uname = $CallbackQuery.from.username
-        if (-not $uname -or $uname -eq "") { $uname = "user$uid" }
-        $result = Handle-TicTacToeMove -GameId $gameId -Position $pos -UserId $uid -UserName $uname
-        if ($result.success) {
-            $game = $result.game
-            $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
-            
-            # Generate player-specific keyboards
-            $rmX = if ($result.gameOver) { 
-                Get-TicTacToeKeyboard -Board $game.board -GameOver $true -Game $game
-            } else { 
-                Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.XUserId
-            }
-            $rmO = if ($result.gameOver) { 
-                Get-TicTacToeKeyboard -Board $game.board -GameOver $true -Game $game
-            } else { 
-                Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.OUserId
-            }
-            
-            # Edit X side
-            if ($game.XMessageId -and $canEdit) {
-                $null = Edit-TelegramMessage -ChatId $game.XChatId -MessageId ([int]$game.XMessageId) -Text $result.message -ReplyMarkup $rmX
-            } elseif ($game.XChatId) {
-                $respX = Send-TelegramMessage -ChatId $game.XChatId -Text $result.message -ReplyMarkup $rmX
-                try { if ($respX -and $respX.ok -and $respX.result) { $game.XMessageId = [int]$respX.result.message_id } } catch { }
-            }
-            # Edit O side
-            if ($game.OChatId) {
-                if ($game.OMessageId -and $canEdit) {
-                    $null = Edit-TelegramMessage -ChatId $game.OChatId -MessageId ([int]$game.OMessageId) -Text $result.message -ReplyMarkup $rmO
-                } else {
-                    $respO = Send-TelegramMessage -ChatId $game.OChatId -Text $result.message -ReplyMarkup $rmO
-                    try { if ($respO -and $respO.ok -and $respO.result) { $game.OMessageId = [int]$respO.result.message_id } } catch { }
-                }
-            }
-            if ($result.gameOver) {
-                # Remove finished game
-                $script:TicTacToeGames = @($script:TicTacToeGames | Where-Object { $_.id -ne $game.id })
-                Save-TicTacToeState
-            }
-        }
-        else {
-            try {
-                $alertBody = @{
-                    callback_query_id = $queryId
-                    text = $result.message
-                    show_alert = $true
-                } | ConvertTo-Json
-                Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $alertBody | Out-Null
-            }
-            catch {
-                Write-Log "Failed to send callback alert: $_" "WARN"
-            }
-        }
-        return
-    }
-    if ($callbackData -eq 'ttt_join_any') {
-        $uid = [long]$CallbackQuery.from.id
-        $uname = $CallbackQuery.from.username
-        if (-not $uname -or $uname -eq "") { $uname = "user$uid" }
-        $result = Join-TicTacToeAny -UserId $uid -UserName $uname -ChatId $chatId
-        if ($result.success) {
-            $game = $result.game
-            
-            # Generate player-specific keyboards
-            $rmX = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.XUserId
-            $rmO = Get-TicTacToeKeyboard -Board $game.board -GameOver $false -Game $game -CurrentUserId $game.OUserId
-            
-            # Send board to O (this chat)
-            $respO = Send-TelegramMessage -ChatId $chatId -Text $result.message -ReplyMarkup $rmO
-            try { if ($respO -and $respO.ok -and $respO.result) { $game.OMessageId = [int]$respO.result.message_id } } catch { }
-            # Update X side board
-            $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
-            if ($game.XChatId -and $game.XMessageId -and $canEdit) {
-                $null = Edit-TelegramMessage -ChatId $game.XChatId -MessageId ([int]$game.XMessageId) -Text $result.message -ReplyMarkup $rmX
-            } elseif ($game.XChatId) {
-                $respX = Send-TelegramMessage -ChatId $game.XChatId -Text $result.message -ReplyMarkup $rmX
-                try { if ($respX -and $respX.ok -and $respX.result) { $game.XMessageId = [int]$respX.result.message_id } } catch { }
-            }
-        }
-        else {
-            try {
-                $alertBody = @{
-                    callback_query_id = $queryId
-                    text = $result.message
-                    show_alert = $true
-                } | ConvertTo-Json
-                Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $alertBody | Out-Null
-            }
-            catch {
-                Write-Log "Failed to send callback alert: $_" "WARN"
-            }
-        }
-        return
-    }
-    if ($callbackData -eq 'ttt_disabled') {
-        # Silently acknowledge disabled button click (not player's turn)
-        try {
-            $alertBody = @{
-                callback_query_id = $queryId
-            } | ConvertTo-Json
-            Invoke-RestMethod -Uri $answerUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $alertBody | Out-Null
-        }
-        catch {
-            Write-Log "Failed to acknowledge disabled button: $_" "WARN"
-        }
-        return
-    }
-    if ($callbackData -match '^ttt_quit_(\d+)$') {
-        $gameId = [int]$matches[1]
-        $game = Get-GameById -GameId $gameId
-        if ($game) {
-            $canEdit = (Get-Command Edit-TelegramMessage -ErrorAction SilentlyContinue)
-            if ($game.XChatId -and $game.XMessageId -and $canEdit) { $null = Edit-TelegramMessage -ChatId $game.XChatId -MessageId ([int]$game.XMessageId) -Text "$script:TTT_CROSS Game ended." }
-            elseif ($game.XChatId) { Send-TelegramMessage -ChatId $game.XChatId -Text "$script:TTT_CROSS Game ended." | Out-Null }
-            if ($game.OChatId) {
-                if ($game.OMessageId -and $canEdit) { $null = Edit-TelegramMessage -ChatId $game.OChatId -MessageId ([int]$game.OMessageId) -Text "$script:TTT_CROSS Game ended." }
-                else { Send-TelegramMessage -ChatId $game.OChatId -Text "$script:TTT_CROSS Game ended." | Out-Null }
-            }
-            $script:TicTacToeGames = @($script:TicTacToeGames | Where-Object { $_.id -ne $gameId })
-            Save-TicTacToeState
-        } else {
-            Send-TelegramMessage -ChatId $chatId -Text "$script:TTT_CROSS Game ended." | Out-Null
-        }
-        return
-    }
 }
 
 function Start-BotPolling {
@@ -2096,36 +1413,4 @@ try {
 catch {
     Write-Log "💥 Fatal error: $_" "ERROR"
     exit 1
-}
-
-function Edit-TelegramMessage {
-    param(
-        [Parameter(Mandatory=$true)]
-        [long]$ChatId,
-        [Parameter(Mandatory=$true)]
-        [int]$MessageId,
-        [Parameter(Mandatory=$true)]
-        [string]$Text,
-        [string]$ParseMode = "Markdown",
-        [object]$ReplyMarkup = $null
-    )
-    try {
-        $body = @{
-            chat_id = $ChatId
-            message_id = $MessageId
-            text = $Text
-            parse_mode = $ParseMode
-        }
-        if ($ReplyMarkup) { $body.reply_markup = $ReplyMarkup }
-        $jsonBody = $body | ConvertTo-Json -Depth 10
-        $response = Invoke-RestMethod -Uri "$script:BaseUrl/editMessageText" `
-            -Method Post `
-            -ContentType "application/json; charset=utf-8" `
-            -Body $jsonBody
-        return $response
-    }
-    catch {
-        Write-Log "Failed to edit message: $_" "ERROR"
-        return $null
-    }
 }
