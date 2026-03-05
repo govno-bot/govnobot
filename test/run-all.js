@@ -82,8 +82,9 @@ class TestRunner {
     return new Promise((resolve) => {
       const relativePath = path.relative(process.cwd(), filePath);
       console.log(`\n${colors.cyan}Running:${colors.reset} ${relativePath}`);
-      // Fork a new process for each test file
-      const child = fork(filePath, [], {
+      // Fork a new process for each test file via worker
+      const workerPath = path.join(__dirname, 'worker.js');
+      const child = fork(workerPath, [filePath], {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc']
       });
       let failed = false;
@@ -109,6 +110,21 @@ class TestRunner {
         resolve();
       });
     });
+  }
+
+  /**
+   * Run a named test case
+   */
+  async test(name, fn) {
+    console.log(`  Running: ${name}`);
+    try {
+      await fn();
+      // If we get here without error, checking stats might be needed if fn used assertions
+    } catch (error) {
+      this.stats.failed++;
+      this.recordFailure(name, error.message, error);
+      console.log(`  ${colors.red}✗${colors.reset} ${name} failed: ${error.message}`);
+    }
   }
 
   /**
@@ -254,9 +270,29 @@ class TestRunner {
     ];
     
     let allTestFiles = [];
-    for (const dir of testDirs) {
-      const files = this.findTestFiles(dir);
-      allTestFiles = allTestFiles.concat(files);
+    
+    // Check if arguments were provided
+    const args = process.argv.slice(2);
+    
+    if (args.length > 0) {
+      // If arguments provided, filter files based on arguments
+      // Arguments can be full paths or partial filenames
+      for (const dir of testDirs) {
+        const files = this.findTestFiles(dir);
+        allTestFiles = allTestFiles.concat(files);
+      }
+      
+      allTestFiles = allTestFiles.filter(file => {
+        return args.some(arg => file.includes(arg));
+      });
+      
+      console.log(`Filtering tests matching: ${args.join(', ')}`);
+    } else {
+      // No arguments, run all tests
+      for (const dir of testDirs) {
+        const files = this.findTestFiles(dir);
+        allTestFiles = allTestFiles.concat(files);
+      }
     }
     
     if (allTestFiles.length === 0) {
