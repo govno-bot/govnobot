@@ -50,7 +50,7 @@ try {
   // Set some test env vars
   process.env.TELEGRAM_GOVNOBOT_TOKEN = 'demo_token_123';
   process.env.TELEGRAM_ADMIN_USERNAME = 'demo_admin';
-  process.env.OLLAMA_MODEL = 'llama2';
+  process.env.OLLAMA_MODEL = 'deepseek-r1:8b';
   
   const config = new Config();
   config.load();

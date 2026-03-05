@@ -10,15 +10,38 @@ class FallbackChain {
   }
 
   async call(input, opts) {
-    let lastErr;
+    const errors = [];
     for (const provider of this.providers) {
       try {
         return await provider.call(input, opts);
       } catch (err) {
-        lastErr = err;
+        errors.push(`${provider.name || 'unnamed'}: ${err.message}`);
       }
     }
-    throw new Error('All providers failed: ' + (lastErr && lastErr.message));
+    throw new Error('All providers failed: ' + errors.join(' | '));
+  }
+
+  /**
+   * Get available models from all providers
+   * @returns {Promise<string[]>} List of unique model names
+   */
+  async listModels() {
+    const models = new Set();
+    
+    for (const provider of this.providers) {
+      if (typeof provider.listModels === 'function') {
+        try {
+          const providerModels = await provider.listModels();
+          if (Array.isArray(providerModels)) {
+            providerModels.forEach(m => models.add(m));
+          }
+        } catch (err) {
+          // Ignore errors during model discovery, just skip
+        }
+      }
+    }
+    
+    return Array.from(models);
   }
 }
 

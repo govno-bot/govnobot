@@ -47,7 +47,7 @@ $script:DataDirectory = Join-Path $PSScriptRoot "govnobot_data"
 **Example Scenario:**
 ```
 User → /model mistral       [Processed by Machine A]
-User → /ask "Hello"         [Processed by Machine B - still using llama2]
+User → /ask "Hello"         [Processed by Machine B - still using deepseek-r1:8b]
 User → /history             [Processed by Machine C - shows empty history]
 ```
 
@@ -269,7 +269,7 @@ Deploy Ollama behind load balancer or use model serving platform:
 09:00 - User: /ask "What is Docker?" → Machine B responds
 09:02 - User: /ask "Explain more"    → Machine A responds (no context from Machine B)
 09:05 - User: /model mistral         → Machine C updates settings (only on Machine C)
-09:06 - User: /ask "Tell me a joke"  → Machine B uses old model (llama2)
+09:06 - User: /ask "Tell me a joke"  → Machine B uses old model (deepseek-r1:8b)
 09:10 - User: /history               → Machine A shows history from 09:02 only
 ```
 

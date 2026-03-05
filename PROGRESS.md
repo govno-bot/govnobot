@@ -197,3 +197,15 @@ We have:
 - ✅ Documentation and examples
 
 **Ready to proceed to Phase 1.2: Logger, File Lock, and Error Handler modules!**
+
+### ✅ Completed: Phase 3.3 - Dynamic Model Discovery & Fixes
+- **Issue**: User reported phantom models in `/model` list despite only having local models installed.
+- **Root Cause**: `src/config.js` and `.env` contained default models that were being merged with dynamic discovery results.
+- **Fix**:
+  - Implemented `listModels()` in `OpenAIClient` to participate in dynamic discovery.
+  - Updated `CommandHandler` to prioritize dynamic results over static config when available.
+  - If dynamic discovery returns models, static config is ignored (preventing pollution).
+- **Verification**:
+  - All 27 test suites passed.
+  - `Ollama` models are correctly listed.
+  - `OpenAI` models are listed only if API key is present.

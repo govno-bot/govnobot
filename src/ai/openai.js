@@ -16,6 +16,7 @@ class OpenAIClient {
     this.apiKey = opts.apiKey || process.env.OPENAI_API_KEY || '';
     this.baseUrl = opts.baseUrl || 'https://api.openai.com';
     this.model = opts.model || 'gpt-3.5-turbo';
+    this.name = 'openai';
   }
 
   /**
@@ -63,6 +64,28 @@ class OpenAIClient {
       req.write(body);
       req.end();
     });
+  }
+
+  /**
+   * Adapter for FallbackChain
+   */
+  async call(prompt, options) {
+    // Convert string prompt to messages format
+    const messages = Array.isArray(prompt) ? prompt : [{ role: 'user', content: prompt }];
+    return this.chat(messages, options);
+  }
+
+  /**
+   * List configured models for OpenAI
+   * Since OpenAI API doesn't list plan-available models easily without auth,
+   * we return the configured model if API key is present.
+   * @returns {Promise<string[]>}
+   */
+  async listModels() {
+    if (this.apiKey) {
+      return [this.model];
+    }
+    return [];
   }
 }
 

@@ -10,11 +10,12 @@ class OllamaClient {
   /**
    * @param {Object} opts
    * @param {string} [opts.baseUrl] - e.g. 'http://localhost:11434'
-   * @param {string} [opts.model] - e.g. 'llama2'
+   * @param {string} [opts.model] - e.g. 'deepseek-r1:8b'
    */
   constructor(opts = {}) {
     this.baseUrl = opts.baseUrl || 'http://localhost:11434';
-    this.model = opts.model || 'llama2';
+    this.model = opts.model || 'deepseek-r1:8b';
+    this.name = 'ollama';
   }
 
   /**
@@ -60,6 +61,49 @@ class OllamaClient {
       req.write(body);
       req.end();
     });
+  }
+
+  /**
+   * List available models from Ollama
+   * @returns {Promise<string[]>} List of model names
+   */
+  async listModels() {
+    return new Promise((resolve, reject) => {
+      const url = new URL('/api/tags', this.baseUrl);
+      const isHttps = url.protocol === 'https:';
+      
+      const req = (isHttps ? https : http).get(url.toString(), (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode !== 200) {
+              // If API fails, return empty list instead of throwing (graceful degradation)
+              return resolve([]);
+            }
+            const json = JSON.parse(data);
+            if (json.models && Array.isArray(json.models)) {
+              const models = json.models.map(m => m.name);
+              resolve(models);
+            } else {
+              resolve([]);
+            }
+          } catch (error) {
+            resolve([]); // Return empty on parse error
+          }
+        });
+      });
+      
+      req.on('error', () => resolve([])); // Return empty on network error
+      req.end();
+    });
+  }
+
+  /**
+   * Adapter for FallbackChain
+   */
+  async call(prompt, options) {
+    return this.generate(prompt, options);
   }
 }
 

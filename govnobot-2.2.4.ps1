@@ -73,8 +73,8 @@ $script:VersionDate = "2025-12-31"
 $script:LastUpdateId = 0
 # Note: it is possible to use MacBook ip adress to use ollama
 $script:OllamaUrl = "http://localhost:11434/api/generate"
-$script:OllamaModel = "llama2"
-$script:AvailableModels = @("llama2", "mistral", "neural-chat", "dolphin-mixtral")
+$script:OllamaModel = "deepseek-r1:8b"
+$script:AvailableModels = @("deepseek-r1:8b", "mistral", "neural-chat", "dolphin-mixtral")
 
 # Persistence paths
 $script:DataDirectory = Join-Path $PSScriptRoot "govnobot_data"
@@ -631,7 +631,7 @@ function Invoke-Telegram-Command {
         "/stats - Bot statistics`n" +
         "/status - Bot health status`n" +
         "/history [n] - Show last n messages (default: 5)`n" +
-        "/model [name] - Switch AI model (llama2, mistral, neural-chat)`n" +
+        "/model [name] - Switch AI model (deepseek-r1:8b, mistral, neural-chat)`n" +
         "/settings - Show your settings`n" +
         "/sh [command] - Execute shell command (admin)`n" +
         "/jack [text] - Sends a message to Jack via Facebook`n" +

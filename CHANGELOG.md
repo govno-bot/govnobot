@@ -4,6 +4,110 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.0] - 2026-03-05 - History Command Feature
+
+### ✅ Added - Conversation History
+- Integrated conversation logging into `/ask` command flow via `HistoryStore`.
+- Implemented `/history` command to list last 10 interactions with Markdown formatting.
+- Added `/history clear` subcommand to purge user conversation data.
+- Added comprehensive unit tests for history interactions and persistence.
+
+---
+
+## [1.9.0] - 2026-03-05 - Signed Admin Audit Logging
+
+### ✅ Added - Signed Audit System
+- Introduced `AuditLogger` with cryptographic signing (HMAC-SHA256) for tamper-evident admin logs.
+- Enforced `AUDIT_LOG_SECRET` for log integrity verification.
+- Integrated audit logging into all admin commands automatically.
+- Added comprehensive unit tests for `AuditLogger` covering signature validation and tamper detection.
+
+---
+
+## [1.8.0] - 2026-03-05 - Secure Admin CLI
+
+### ✅ Added - Secure Admin Shell
+- Developed `/sh <command>` command flow for secure remote shell execution.
+- Added strict `isAdmin` enforcement for sensitive commands.
+- Implemented command whitelist (`config.security.shCommandWhitelist`).
+- Developed comprehensive TDD/BDD tests via `test/unit/command-sh.test.js` covering privilege escalation attempts, whitelist bypass, and output processing.
+- Ensured shell output is truncated safely for Telegram API limits.
+- Audited all admin actions via `logAuditAction` with timestamp and status.
+- Updated version to 1.8.0.
+
+---
+
+## [1.7.0] - 2026-03-05 - Rate Limiting & Anti-Spam
+
+### ✅ Added - Security & Rate Limiting
+- Developed comprehensive rate-limit flow (per-user, per-minute, per-hour thresholds).
+- Implemented user warning messages when rate limits are exceeded.
+- Added strict enforcement in `CommandHandler` to block spam requests.
+- Added `test/unit/rate-limit-flow.test.js` for TDD verification.
+- Verified end-to-end integration via `test/acceptance/integration-e2e.test.js`.
+- Updated version to 1.7.0.
+
+---
+
+## [1.6.0] - 2026-03-05 - Status & Version Reporting
+
+### ✅ Added - Status & Version Commands
+- Developed `/status` command to report bot uptime, memory usage, current model, and version.
+- Developed `/version` command to report the current bot version.
+- Integrated `/status` with live process metrics (uptime, heap usage).
+- Updated configuration to version 1.6.0.
+- Added comprehensive unit tests via `test/unit/command-status-version.test.js`.
+
+---
+
+## [1.5.0] - 2026-03-05 - Settings Management
+
+### ✅ Added - Settings Command
+- Developed `/settings` command flow for viewing current user configuration.
+- Developed `/settings <key> <value>` flow for updating preferences.
+- Added validation for `model` (must be in available list) and `systemPrompt` (any string).
+- Standardized settings storage location to `data/settings/`.
+- Ensured consistent settings access across `/model` and `/settings` commands.
+- Added comprehensive unit tests via `test/unit/command-settings.test.js` and updated `test/unit/command-model.test.js`.
+
+---
+
+## [1.4.0] - 2026-03-05 - History Command
+
+### ✅ Added - History Command
+- Developed `/history` command flow for viewing recent conversation history.
+- Developed `/history clear` flow for securely erasing user chat logs.
+- Added message formatting with role icons (👤 and 🤖) and safe HTML escaping.
+- Implemented robust error handling for history load/save failures.
+- Added comprehensive unit tests via `test/unit/command-history.test.js`.
+- Verified conversation continuity and empty state handling.
+
+---
+
+## [1.3.0] - 2026-03-05 - Model Selection & Persistence
+
+### ✅ Added - Model Command
+- Developed `/model` command flow for viewing available AI models and current selection.
+- Developed `/model <name>` flow for switching models with real-time validation.
+- Implemented persistent storage of user model preference via `SettingsStore`.
+- Added strict model name validation against configured `availableModels`.
+- Added specific error messaging for unknown or invalid models.
+- Achieved 100% test coverage via `test/unit/command-model.test.js`.
+
+---
+
+## [1.2.0] - 2026-03-05 - AI Ask Command
+
+### ✅ Added - Ask Command
+- Developed `/ask <question>` command flow with AI integration.
+- Implemented robust `FallbackChain` integration using `Ollama` (primary) and `OpenAI` (fallback).
+- Added intelligent long-message splitting for Telegram message limits (4096 chars).
+- Implemented graceful error handling and user feedback for AI outages.
+- Added comprehensive unit tests (`test/unit/command-ask.test.js` and updated `command-handler.test.js`).
+- Standardized `OllamaClient` and `OpenAIClient` interfaces for provider chain compatibility.
+
+---
+
 ## [1.1.0] - 2026-03-05 - User Onboarding Flow
 
 ### ✅ Added - User Onboarding

@@ -471,7 +471,7 @@ function Format-Cached-Response {
         $errorText = "❌ **Request Failed** (${duration}s)`n`n$($result.message)`n`n"
         $errorText += "**Troubleshooting:**`n"
         $errorText += "• Check bot logs: `/status``n"
-        $errorText += "• Try different model: `/model llama2``n"
+        $errorText += "• Try different model: `/model deepseek-r1:8b``n"
         $errorText += "• Contact admin: @YourUserName"
         
         Edit-TelegramMessage -ChatId $chatId -MessageId $statusMsg.result.message_id -Text $errorText

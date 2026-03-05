@@ -12,7 +12,7 @@ class SettingsStore {
     this.dataDir = dataDir;
     this.filePath = path.join(dataDir, `${userId}.json`);
     this.defaultSettings = {
-      model: 'llama2',
+      model: 'deepseek-r1:8b',
       systemPrompt: 'You are a helpful assistant.',
     };
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });

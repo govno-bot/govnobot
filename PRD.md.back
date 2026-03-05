@@ -2,86 +2,73 @@
 
 ## Overview
 A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to Node.js, following strict TDD/BDD/ADD methodology. The project aims for 100% test coverage, cross-platform support, and educational value by using only Node.js built-in modules.
-
 > **⚠️ Important:** Always make edits to `PRD.md` as the *final step* in your workflow. Ensure all implementation and testing are complete before updating this document to reflect the final, verified state of the project.
 
-## Todo
-- [x] Develop `/start` and `/help` user onboarding flow with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop `/ask <question>` response flow (including long-message splitting and AI outage fallback) with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop `/model` and `/model <name>` selection flow (including invalid model handling) with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Expand `/history` behavior to fully cover listing and `clear` confirmation scenarios via TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop `/settings` and `/settings <key> <value>` management flow (including validation errors) with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop `/status` and `/version` reporting flow with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop anti-spam/rate-limit user flow (minute/hour thresholds, warning, unblock window reset) with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop secure admin `/sh <command>` flow with admin-only enforcement and non-admin rejection via TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop signed admin audit logging flow (timestamp, actor, action details) with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop global error-handling UX flow (safe user messages + internal logging without sensitive leakage) with TDD/BDD, update versioning and `CHANGELOG.md`, commit changes
-- [x] Develop history command feature, TDD/BDD, keep versioning and CHANGELOG.md, don't forget to commit
+## Tasks
+- [x] Define user stories and acceptance criteria for all bot interactions (TDD/BDD)
+- [x] Implement message receiving and command parsing with failing tests first (TDD)
+- [x] Develop user feedback and error messaging flows, writing tests before code
+- [x] Add conversation history and settings management with BDD-style scenarios
+ - [x] Test and refine all user interaction paths until all acceptance tests pass
+- [x] Document user interaction flows and testing approach for contributors
+- [x] Read TODO.md and PROGRESS.md, add more tasks to this list.
 
-## Implementation Status
-
-### Core Modules
 - [x] Implement Logger Module (test/unit/logger.test.js, src/utils/logger.js)
-- [x] Implement File Lock Module (test/unit/file-lock.test.js, src/storage/file-lock.js)
+ - [x] Implement File Lock Module (test/unit/file-lock.test.js, src/storage/file-lock.js)
 - [x] Implement Error Handler Module (test/unit/error-handler.test.js, src/utils/error-handler.js)
 - [x] Implement History Store (test/unit/history-store.test.js, src/storage/history-store.js)
 - [x] Implement Settings Store (test/unit/settings-store.test.js, src/storage/settings-store.js)
 - [x] Implement Backup Manager (test/unit/backup-manager.test.js, src/storage/backup-manager.js)
-
-### Security & AI
 - [x] Implement Rate Limiter (test/unit/rate-limiter.test.js, src/security/rate-limiter.js)
 - [x] Implement Admin Validator (test/unit/admin-validator.test.js, src/security/admin-validator.js)
 - [x] Implement Crypto Utils (test/unit/crypto-utils.test.js, src/security/crypto-utils.js)
 - [x] Implement Telegram API Client (test/unit/telegram-api-client.test.js, src/telegram/api-client.js)
 - [x] Implement Polling Loop (test/unit/polling.test.js, src/telegram/polling.js)
 - [x] Implement Ollama Client (test/unit/ollama.test.js, src/ai/ollama.js)
-- [x] Implement OpenAI Client (test/unit/openai.test.js, src/ai/openai.js)
-- [x] Implement Fallback Chain (test/unit/fallback-chain.test.js, src/ai/fallback-chain.js)
-
-### Commands & Finalization
+- [x] Run all tests. Read output carefuly. Notice some tests are not passing. Fix.
+ - [x] Implement OpenAI Client (test/unit/openai.test.js, src/ai/openai.js)
+ - [x] Implement Fallback Chain (test/unit/fallback-chain.test.js, src/ai/fallback-chain.js)
+- [x] Some tests are still not passing. Make sure all test are pass.
 - [x] Implement Command Handler (test/unit/command-handler.test.js, src/commands/command-handler.js)
+- [x] Fix settings.store bug
 - [x] Implement Public Commands: /start, /help, /ask, /fix, /history, /model, /settings, /stats, /status, /version
 - [x] Implement Admin Commands: /sh, /agent
 - [x] Write Integration & E2E Tests (Phase 7)
+- [x] Fix heap out of memory bug
 - [x] Complete Documentation Phase (ARCHITECTURE.md, API.md, TEST-STRATEGY.md, etc.)
-- [x] Verify admin notifications (Env vars: TELEGRAM_GOVNOBOT_TOKEN, etc.)
+- [x] Use govnobod to send message to admin. Make sure message send. Env vars: TELEGRAM_GOVNOBOT_TOKEN, TELEGRAM_GOVNOBOT_ADMIN_CHATID and TELEGRAM_GOVNOBOT_ADMIN_USERNAME
 
 ## Technical Details
-
-*   **Runtime**: Node.js (Latest LTS recommended).
-*   **Dependencies**: Zero external dependencies. Uses only built-in modules (`fs`, `http`, `https`, `crypto`, `path`, `child_process`, etc.).
-*   **Persistence**: JSON-based file storage with atomic write and file locking mechanisms to prevent data corruption.
-*   **Architecture**: Modular, service-based architecture with dependency injection for simplified testing.
-*   **Platform**: Cross-platform (Windows, macOS, Linux).
-
 ## User Interaction Flows
 
 The following outlines the main user interaction flows for GovnoBot. Each flow is covered by automated tests and is designed to be clear, predictable, and user-friendly.
 
+### User Flows
+
 - **Start/Help:**
-    - `/start` — User receives a welcome message and usage instructions.
-    - `/help` — User receives a list of all available commands and their descriptions.
+	- `/start` — User receives a welcome message and usage instructions.
+	- `/help` — User receives a list of all available commands and their descriptions.
 - **Ask a Question:**
-    - `/ask <question>` — User receives an AI-generated answer. Long answers are split into multiple messages. If the AI service is unavailable, a friendly error is returned.
+	- `/ask <question>` — User receives an AI-generated answer. Long answers are split into multiple messages. If the AI service is unavailable, a friendly error is returned.
 - **Model Selection:**
-    - `/model` — User sees available models and their current selection.
-    - `/model <name>` — User changes the model. Invalid models trigger an error and a list of valid options.
+	- `/model` — User sees available models and their current selection.
+	- `/model <name>` — User changes the model. Invalid models trigger an error and a list of valid options.
 - **Conversation History:**
-    - `/history` — User receives recent conversation history.
-    - `/history clear` — User clears their history and receives confirmation.
+	- `/history` — User receives recent conversation history.
+	- `/history clear` — User clears their history and receives confirmation.
 - **Settings Management:**
-    - `/settings` — User views current settings.
-    - `/settings <key> <value>` — User updates a setting. Invalid keys/values return errors and valid options.
+	- `/settings` — User views current settings.
+	- `/settings <key> <value>` — User updates a setting. Invalid keys/values return errors and valid options.
 - **Status/Version:**
-    - `/status` — User receives uptime, model, and health info.
-    - `/version` — User receives the current version.
+	- `/status` — User receives uptime, model, and health info.
+	- `/version` — User receives the current version.
 - **Rate Limiting:**
-    - If a user exceeds rate limits, they receive a warning and are blocked until the window resets.
+	- If a user exceeds rate limits, they receive a warning and are blocked until the window resets.
 - **Admin Actions:**
-    - `/sh <command>` (admin only) — Executes a shell command and returns output. Non-admins receive an error.
-    - All admin actions are logged for audit purposes.
+	- `/sh <command>` (admin only) — Executes a shell command and returns output. Non-admins receive an error.
+	- All admin actions are logged for audit purposes.
 - **Error Handling:**
-    - All errors are logged. Users receive friendly, non-sensitive error messages.
+	- All errors are logged. Users receive friendly, non-sensitive error messages.
 
 ## Testing Approach for Contributors
 
@@ -90,22 +77,31 @@ GovnoBot is developed using strict TDD (Test-Driven Development), BDD (Behavior-
 ### How to Contribute Tests
 
 1. **Unit Tests:**
-     - Add or update tests in `test/unit/` (e.g., `message-handler.test.js`).
-     - Write failing tests for new features or bug fixes before implementing code.
-     - Cover all edge cases, error handling, and user scenarios.
+	 - Add or update tests in `test/unit/` (e.g., `message-handler.test.js`).
+	 - Write failing tests for new features or bug fixes before implementing code.
+	 - Cover all edge cases, error handling, and user scenarios.
 
 2. **BDD/Acceptance Tests:**
-     - Use BDD-style descriptions and scenarios for user flows.
-     - Ensure all acceptance criteria in PRD.md are covered by tests.
+	 - Use BDD-style descriptions and scenarios for user flows (see `test/unit/message-handler.test.js`).
+	 - Ensure all acceptance criteria in PRD.md are covered by tests.
 
 3. **Running Tests:**
-     - Use `npm test` or `node test/run-all.js` to run all tests.
-     - All tests must pass before submitting a pull request.
+	 - Use `npm test` or `node test/run-all.js` to run all tests.
+	 - All tests must pass before submitting a pull request.
 
 4. **Test Coverage:**
-     - Strive for 100% coverage of all user interaction paths and error cases.
-     - No code should be merged without corresponding tests.
+	 - Strive for 100% coverage of all user interaction paths and error cases.
+	 - No code should be merged without corresponding tests.
 
+5. **Documentation:**
+	 - Update this section if new user flows or testing practices are introduced.
+
+### Example: Adding a New Command
+
+1. Add a failing test for the new command in `test/unit/message-handler.test.js`.
+2. Implement the command in the appropriate module.
+3. Run tests and ensure all pass.
+4. Update documentation as needed.
 ## User Stories & Acceptance Criteria (TDD/BDD)
 
 ### 1. As a user, I want to start a conversation with the bot so I can receive help and instructions.
@@ -158,3 +154,8 @@ GovnoBot is developed using strict TDD (Test-Driven Development), BDD (Behavior-
 **Acceptance Criteria:**
 - If an error occurs, the bot logs the error and replies with a user-friendly message.
 - No sensitive information is leaked in error messages.
+- Node.js only: absolutely no external npm packages or dependencies
+- All features and modules must be covered by automated tests (TDD-first)
+- Directory structure includes `src/`, `test/`, `data/`, and comprehensive documentation
+- Project is cross-platform (Windows, macOS, Linux) and educational in design
+- Documentation files guide new users, provide quick reference, and track progress

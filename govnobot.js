@@ -562,7 +562,7 @@ const handleCommand = async (message) => {
       `/stats - Bot statistics\n` +
       `/status - Bot health status\n` +
       `/history [n] - Show last n messages (default: 5)\n` +
-      `/model [name] - Switch AI model (llama2, mistral, neural-chat)\n` +
+      `/model [name] - Switch AI model (deepseek-r1:8b, mistral, neural-chat)\n` +
       `/settings - Show your settings\n` +
       `/sh [command] - Execute shell command (admin)\n` +
       `/jack [text] - Sends a message to Jack via Facebook (admin)\n` +

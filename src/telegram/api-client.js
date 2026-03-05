@@ -16,7 +16,7 @@ class TelegramAPIClient {
     
     this.botToken = botToken;
     this.baseUrl = `https://api.telegram.org/bot${botToken}`;
-    this.requestTimeout = 30000; // 30 seconds
+    this.requestTimeout = 60000; // 60 seconds (must be > long polling timeout)
   }
 
   /**

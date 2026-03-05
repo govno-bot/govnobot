@@ -113,9 +113,9 @@ class Config {
 
     // Ollama configuration
     this.ollama.url = this.env('OLLAMA_URL', 'http://localhost:11434');
-    this.ollama.model = this.env('OLLAMA_MODEL', 'llama2');
+    this.ollama.model = this.env('OLLAMA_MODEL', 'deepseek-r1:8b');
     this.ollama.availableModels = this.envArray('AVAILABLE_MODELS', [
-      'llama2', 'mistral', 'neural-chat', 'dolphin-mixtral'
+      'deepseek-r1:8b', 'mistral', 'neural-chat', 'dolphin-mixtral'
     ]);
 
     // OpenAI configuration (optional fallback)

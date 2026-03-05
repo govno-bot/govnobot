@@ -145,6 +145,13 @@ class Logger {
     const prefix = this.getColoredPrefix('error');
     
     console.error(`${prefix} ${message}`);
+    if (meta) {
+      if (meta instanceof Error) {
+        console.error(meta.stack);
+      } else {
+        console.error(JSON.stringify(meta, null, 2));
+      }
+    }
     this.writeToFile(entry);
   }
 

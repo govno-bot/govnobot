@@ -88,7 +88,7 @@ async function run(runner) {
     config.load();
 
     runner.assertEqual(config.ollama.url, 'http://localhost:11434', 'Ollama URL has default');
-    runner.assertEqual(config.ollama.model, 'llama2', 'Ollama model has default');
+    runner.assertEqual(config.ollama.model, 'deepseek-r1:8b', 'Ollama model has default');
     runner.assertEqual(config.bot.messageChunkSize, 4096, 'Message chunk size has default');
     runner.assert(Array.isArray(config.ollama.availableModels), 'Available models is array');
     runner.assert(config.ollama.availableModels.length > 0, 'Available models has defaults');

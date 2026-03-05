@@ -150,7 +150,7 @@ TELEGRAM_ADMIN_CHATID=your_chat_id
 
 # Optional
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama2
+OLLAMA_MODEL=deepseek-r1:8b
 OPENAI_API_KEY=your_key
 
 # Limits

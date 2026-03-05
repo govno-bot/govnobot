@@ -285,7 +285,7 @@ Required:
 
 Optional:
   OLLAMA_URL - Ollama server (default: http://localhost:11434)
-  OLLAMA_MODEL - Default model (default: llama2)
+  OLLAMA_MODEL - Default model (default: deepseek-r1:8b)
   OPENAI_API_KEY - OpenAI key for fallback
   BOT_POLL_INTERVAL - Poll interval ms (default: 30000)
   BOT_MESSAGE_CHUNK_SIZE - Max message size (default: 4096)

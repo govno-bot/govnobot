@@ -16,6 +16,10 @@ const TelegramAPIClient = require('./telegram/api-client');
 const { startPolling } = require('./telegram/polling');
 const CommandHandler = require('./commands/command-handler');
 const RateLimiter = require('./security/rate-limiter');
+const AuditLogger = require('./security/audit-logger');
+const FallbackChain = require('./ai/fallback-chain');
+const OllamaClient = require('./ai/ollama');
+const OpenAIClient = require('./ai/openai');
 
 let logger;
 let config;
@@ -54,12 +58,70 @@ async function initialize() {
     );
     logger.info('✓ Rate limiter initialized');
     
+    // Initialize AI clients
+    const ollama = new OllamaClient({
+      baseUrl: config.ai.ollamaUrl,
+      model: config.ai.defaultModel
+    });
+    
+    const openai = new OpenAIClient({
+      apiKey: config.ai.openaiApiKey,
+      model: config.ai.openaiModel
+    });
+    
+    // Create AI fallback chain (Ollama first, then OpenAI)
+    // The order is determined by config.ai.fallbackOrder, but implementing full dynamic loading is complex.
+    // For now, we'll just hardcode Ollama -> OpenAI based on typical local-first preference,
+    // or respect the array order if we want to be fancy.
+    // Let's implement dynamic provider selection based on config.ai.fallbackOrder.
+    
+    const providerMap = {
+      'ollama': ollama,
+      'openai': openai
+    };
+    
+    const providers = [];
+    config.ai.fallbackOrder.forEach(name => {
+      const provider = providerMap[name.toLowerCase()];
+      if (provider) {
+        providers.push(provider);
+      } else {
+        logger.warn(`⚠️ Unknown AI provider in fallback order: ${name}`);
+      }
+    });
+    
+    // Add any configured providers that were not in fallbackOrder (fallback to implicit enabled)
+    Object.keys(providerMap).forEach(key => {
+      if (!providers.includes(providerMap[key]) && config.ai.fallbackOrder.length === 0) {
+        // If config is empty, enable all? Or just default?
+        // Let's stick to explicit config or hardcoded default in Config class.
+      }
+    });
+
+    if (providers.length === 0) {
+      logger.warn('⚠️ No valid AI providers configured in fallback order. Defaulting to Ollama -> OpenAI.');
+      providers.push(ollama);
+      providers.push(openai);
+    }
+    
+    const fallbackChain = new FallbackChain(providers);
+    logger.info(`✓ AI chain initialized with: ${providers.map(p => p.name).join(', ')}`);
+
+    // Initialize audit logger
+    const auditLogger = new AuditLogger(
+      config.security.auditLogFile,
+      config.security.auditLogSecret
+    );
+    logger.info('✓ Audit logger initialized');
+
     // Initialize command handler
     commandHandler = new CommandHandler(
       client,
       config,
       logger,
-      rateLimiter
+      rateLimiter,
+      fallbackChain,
+      auditLogger
     );
     logger.info('✓ Command handler initialized');
     

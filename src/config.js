@@ -9,8 +9,9 @@ const path = require('path');
 
 class Config {
   constructor() {
-    this.version = '1.0.0';
-    this.projectRoot = path.dirname(path.dirname(__dirname));
+    this.version = '1.10.0';
+    this.projectRoot = path.dirname(__dirname); // Correctly sets project root from src/
+    this.dataDir = process.env.BOT_DATA_DIR || path.join(this.projectRoot, 'data');
     this.load();
   }
 
@@ -86,18 +87,24 @@ class Config {
    * Parse AI service configuration
    */
   parseAIConfig() {
-    const availableModels = (process.env.AVAILABLE_MODELS || 'llama2')
+    const defaultModels = ['deepseek-r1:8b', 'mistral', 'gpt-4', 'gpt-3.5-turbo'];
+    const availableModels = (process.env.AVAILABLE_MODELS || defaultModels.join(','))
       .split(',')
       .map(m => m.trim())
       .filter(Boolean);
     
+    const fallbackOrder = (process.env.AI_FALLBACK_ORDER || 'ollama,openai')
+      .split(',')
+      .map(p => p.trim())
+      .filter(Boolean);
+
     return {
-      defaultModel: process.env.OLLAMA_MODEL || 'llama2',
+      defaultModel: process.env.OLLAMA_MODEL || 'deepseek-r1:8b',
       availableModels: availableModels,
       ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
       openaiApiKey: process.env.OPENAI_API_KEY || '',
       openaiModel: process.env.OPENAI_MODEL || 'gpt-4',
-      fallbackOrder: ['ollama', 'github', 'openai'], // Try in order
+      fallbackOrder: fallbackOrder, 
     };
   }
 
@@ -141,6 +148,8 @@ class Config {
       ipWhitelist: ipWhitelist,
       shCommandWhitelist: shCommandWhitelist,
       requireIpWhitelist: process.env.ADMIN_IP_WHITELIST_REQUIRED !== 'false',
+      auditLogSecret: process.env.AUDIT_LOG_SECRET || 'default-insecure-secret-please-change',
+      auditLogFile: process.env.AUDIT_LOG_FILE || path.join(this.projectRoot, 'data', 'audit.log'),
     };
   }
 

@@ -62,7 +62,7 @@ See [INDEX.md](INDEX.md) for complete overview and [TODO.md](TODO.md) for roadma
 
 ## Features
 
-- **AI Integration**: Uses Ollama to run local language models (llama2, mistral, neural-chat, etc.)
+- **AI Integration**: Uses Ollama to run local language models (deepseek-r1:8b, mistral, neural-chat, etc.)
 - **Model Switching**: Dynamic model selection via `/model` command
 - **Deployment Management**: Automated backup, status checking, and deployment capabilities
 - **Telegram Integration**: Native Telegram bot API support

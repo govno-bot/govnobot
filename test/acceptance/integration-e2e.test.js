@@ -25,6 +25,9 @@ class MockTelegramAPIClient {
     this.sentMessages.push({ chatId, text });
     return { ok: true, result: { chat: { id: chatId }, text } };
   }
+  async sendChatAction(chatId, action) {
+    return { ok: true };
+  }
 }
 
 // Test runner entrypoint
@@ -33,12 +36,16 @@ async function run(runner) {
   const config = new Config();
   const logger = new Logger('info');
   const client = new MockTelegramAPIClient();
-  const rateLimiter = new RateLimiter(2, 5, logger); // low limits for test
-  const commandHandler = new CommandHandler(client, config, logger, rateLimiter);
+  const rateLimiter = new RateLimiter(100, 1000, logger); // High limits for functional tests
+  // Mock fallback chain
+  const fallbackChain = {
+    call: async (input) => `Mock response to: ${input}`
+  };
+  const commandHandler = new CommandHandler(client, config, logger, rateLimiter, fallbackChain);
 
-  // Helper: simulate update
-  async function simulateUpdate(text, user = { id: 1, username: 'testuser', isAdmin: true }) {
-    const update = {
+  // Helper: create update
+  function createUpdate(text, user = { id: 1, username: 'testuser' }) {
+    return {
       update_id: Math.floor(Math.random() * 100000),
       message: {
         message_id: Math.floor(Math.random() * 100000),
@@ -47,8 +54,17 @@ async function run(runner) {
         text
       }
     };
-    await commandHandler.handle(update);
+  }
+
+  // Helper: simulate update with specific handler
+  async function simulateUpdateWithHandler(handler, text, user) {
+    await handler.handle(createUpdate(text, user));
     return client.sentMessages[client.sentMessages.length - 1]?.text;
+  }
+
+  // Helper: simulate update with default handler
+  async function simulateUpdate(text, user) {
+    return simulateUpdateWithHandler(commandHandler, text, user);
   }
 
   // Test: /start
@@ -61,7 +77,7 @@ async function run(runner) {
 
   // Test: /ask
   reply = await simulateUpdate('/ask What is GovnoBot?');
-  runner.assert(reply && reply.length > 0, '/ask returns a response');
+  runner.assert(reply && reply.length > 0 && !reply.includes('Rate limit'), '/ask returns a response');
 
   // Test: /model
   reply = await simulateUpdate('/model');
@@ -84,18 +100,45 @@ async function run(runner) {
   runner.assert(reply && reply.toLowerCase().includes('version'), '/version returns version');
 
   // Test: /sh (admin)
-  reply = await simulateUpdate('/sh echo test', { id: 1, username: 'admin', isAdmin: true });
+  // Need to mock isAdmin returning true in CommandHandler or pass admin user that matches config
+  // The CommandHandler.isAdmin checks config.telegram.adminUsername.
+  // We need to set it in config.
+  config.telegram.adminUsername = 'admin';
+  config.security.shCommandWhitelist = ['echo'];
+  const shMsgCountBefore = client.sentMessages.length;
+  await commandHandler.handle(createUpdate('/sh echo test', { id: 1, username: 'admin' }, { id: 1 }));
+  
+  // Wait for async shell execution
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  reply = client.sentMessages[client.sentMessages.length - 1]?.text;
+  if (client.sentMessages.length === shMsgCountBefore) {
+      console.log('DEBUG: No new message received for /sh');
+  }
+  
   runner.assert(reply && (reply.toLowerCase().includes('test') || reply.toLowerCase().includes('output')), '/sh returns shell output for admin');
 
   // Test: /sh (non-admin)
-  reply = await simulateUpdate('/sh echo test', { id: 2, username: 'user', isAdmin: false });
+  reply = await simulateUpdate('/sh echo test', { id: 2, username: 'user' });
   runner.assert(reply && reply.toLowerCase().includes('admin'), '/sh returns error for non-admin');
 
   // Test: rate limiting
-  await simulateUpdate('/ask 1');
-  await simulateUpdate('/ask 2');
-  reply = await simulateUpdate('/ask 3');
-  runner.assert(reply && reply.toLowerCase().includes('rate limit'), 'rate limit triggers after limit');
+  // Create a strict rate limiter for this test
+  const strictRateLimiter = new RateLimiter(2, 5, logger);
+  const strictCommandHandler = new CommandHandler(client, config, logger, strictRateLimiter, fallbackChain);
+  const spamUser = { id: 999, username: 'spammer' };
+
+  // 1. Allowed
+  reply = await simulateUpdateWithHandler(strictCommandHandler, '/ask 1', spamUser);
+  runner.assert(reply && !reply.includes('Rate limit'), 'Request 1 allowed');
+  
+  // 2. Allowed
+  reply = await simulateUpdateWithHandler(strictCommandHandler, '/ask 2', spamUser);
+  runner.assert(reply && !reply.includes('Rate limit'), 'Request 2 allowed');
+
+  // 3. Blocked (Limit is 2)
+  reply = await simulateUpdateWithHandler(strictCommandHandler, '/ask 3', spamUser);
+  runner.assert(reply && reply.toLowerCase().includes('rate limit'), 'Request 3 blocked by rate limit');
 
   // Test: error handling (unknown command)
   reply = await simulateUpdate('/unknowncmd');

@@ -83,7 +83,7 @@ govnobot_backups/
 | `/status` | Bot health check (Ollama connection) | No |
 | `/version` | Version information | No |
 | `/history [n]` | Show last n messages (default: 5) | N/A |
-| `/model [name]` | Switch AI model (llama2, mistral, etc.) | No |
+| `/model [name]` | Switch AI model (deepseek-r1:8b, mistral, etc.) | No |
 | `/settings` | View/modify user preferences | No |
 
 ### Admin-Only Commands (Username + Chat ID validation)
@@ -210,8 +210,8 @@ function RestrictToAdmin {
 ### Ollama Configuration
 ```powershell
 $script:OllamaUrl = "http://localhost:11434/api/generate"
-$script:OllamaModel = "llama2"
-$script:AvailableModels = @("llama2", "mistral", "neural-chat", "dolphin-mixtral")
+$script:OllamaModel = "deepseek-r1:8b"
+$script:AvailableModels = @("deepseek-r1:8b", "mistral", "neural-chat", "dolphin-mixtral")
 ```
 **Note**: Comment indicates MacBook IP address can be used for remote Ollama.
 
@@ -325,8 +325,8 @@ Create `govnobot.config.json`:
   },
   "ai": {
     "ollamaUrl": "http://localhost:11434/api/generate",
-    "defaultModel": "llama2",
-    "availableModels": ["llama2", "mistral", "neural-chat"]
+    "defaultModel": "deepseek-r1:8b",
+    "availableModels": ["deepseek-r1:8b", "mistral", "neural-chat"]
   },
   "rateLimits": {
     "requestsPerMinute": 10,

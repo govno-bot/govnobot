@@ -56,10 +56,13 @@ class CommandHandler {
   async handleFix(context) {
     const { chatId, args } = context;
     if (args.length === 0) {
-      await this.client.sendMessage(chatId, '❌ Usage: /fix <problem description>');
+      await this.client.sendMessage(chatId, '❌ Usage: /fix &lt;problem description&gt;');
       return;
     }
-    const problem = args.join(' ');
+    const problem = args.join(' ')
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     await this.client.sendChatAction(chatId, 'typing');
     // Placeholder response
     const response = `🛠️ Problem: "${problem}"
@@ -165,10 +168,15 @@ class CommandHandler {
     } else if (this.publicCommands.has(commandName)) {
       handler = this.publicCommands.get(commandName);
     } else {
-      // Unknown command
+      // Unknown command - escape command name for display
+      const safeCommand = commandName
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+        
       await this.client.sendMessage(
         chatId,
-        `❌ Unknown command: /${commandName}\n\nUse /help for available commands.`
+        `❌ Unknown command: /${safeCommand}\n\nUse /help for available commands.`
       );
       return;
     }
@@ -233,7 +241,7 @@ class CommandHandler {
 I'm a Telegram bot that helps you with questions and provides AI-powered assistance.
 
 <b>Available Commands:</b>
-/ask <query> - Ask me a question
+/ask &lt;query&gt; - Ask me a question
 /help - Show this help message
 /model - Switch AI models
 /settings - Configure your preferences
@@ -251,13 +259,14 @@ Use /help for more information.
    */
   async handleHelp(context) {
     const { chatId, isAdmin } = context;
+    const availableModels = await this.getAvailableModels();
     
     let message = `
 <b>GovnoBot Commands</b>
 
 <b>Public Commands:</b>
-/ask <query> - Ask a question
-/fix <query> - Fix a problem
+/ask &lt;query&gt; - Ask a question
+/fix &lt;query&gt; - Fix a problem
 /model - Change AI model
 /settings - View/change settings
 /history - View conversation history
@@ -265,14 +274,14 @@ Use /help for more information.
 /help - Show this message
 
 <b>Available Models:</b>
-${this.config.ai.availableModels.join(', ')}
+${availableModels.join(', ')}
     `.trim();
     
     if (isAdmin) {
       message += `
 
 <b>Admin Commands:</b>
-/sh <command> - Execute shell command
+/sh &lt;command&gt; - Execute shell command
 /audit - View audit log
       `;
     }
@@ -287,7 +296,7 @@ ${this.config.ai.availableModels.join(', ')}
     const { chatId, args } = context;
     
     if (args.length === 0) {
-      await this.client.sendMessage(chatId, '❌ Usage: /ask <your question>');
+      await this.client.sendMessage(chatId, '❌ Usage: /ask &lt;your question&gt;');
       return;
     }
     
@@ -296,6 +305,16 @@ ${this.config.ai.availableModels.join(', ')}
     // Show typing indicator
     await this.client.sendChatAction(chatId, 'typing');
     
+    // Save user message to history
+    const historyDir = path.join(this.config.dataDir, 'history');
+    const historyStore = new HistoryStore(historyDir);
+    
+    try {
+      await historyStore.addMessage(chatId, 'user', question);
+    } catch (err) {
+      this.logger.error(`Error saving user message to history for ${chatId}`, err);
+    }
+    
     try {
       if (!this.fallbackChain) {
         throw new Error('AI service not configured');
@@ -303,6 +322,13 @@ ${this.config.ai.availableModels.join(', ')}
 
       // Call AI service
       const answer = await this.fallbackChain.call(question);
+      
+      // Save assistant message to history
+      try {
+        await historyStore.addMessage(chatId, 'assistant', answer);
+      } catch (err) {
+        this.logger.error(`Error saving assistant message to history for ${chatId}`, err);
+      }
       
       // Split long messages
       const chunks = chunk(answer);
@@ -335,26 +361,32 @@ ${this.config.ai.availableModels.join(', ')}
       settings = { model: this.config.ai.defaultModel };
     }
     
+    // Fetch available models dynamically
+    const availableModels = await this.getAvailableModels();
+    
     if (args.length === 0) {
-      const models = this.config.ai.availableModels.join('\n');
+      const models = availableModels.join('\n');
       const message = `
 <b>Available AI Models:</b>
 ${models}
 
 <b>Current model:</b> ${settings.model || this.config.ai.defaultModel}
 
-Use: /model <model_name>
+Use: /model &lt;model_name&gt;
       `.trim();
       await this.client.sendMessage(chatId, message, { parse_mode: 'HTML' });
       return;
     }
     
-    const selectedModel = args[0].toLowerCase();
+    const selectedModel = args[0].toLowerCase()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     
-    if (!this.config.ai.availableModels.includes(selectedModel)) {
+    if (!availableModels.includes(selectedModel)) {
       await this.client.sendMessage(
         chatId,
-        `❌ Invalid model: ${selectedModel}\n\nAvailable models: ${this.config.ai.availableModels.join(', ')}`
+        `❌ Invalid model: ${selectedModel}\n\nAvailable models: ${availableModels.join(', ')}`
       );
       return;
     }
@@ -410,25 +442,33 @@ Examples:
     }
     
     // Update setting
-    const key = args[0];
+    const key = args[0]
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     let value = args.slice(1).join(' ');
 
     if (!value) {
-      await this.client.sendMessage(chatId, `❌ Usage: /settings ${key} <value>`);
+      await this.client.sendMessage(chatId, `❌ Usage: /settings ${key} &lt;value&gt;`);
       return;
     }
 
     // Validation
-    if (key === 'model') {
+    // Remove HTML encoding from input for checking
+    const rawKey = key.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    
+    if (rawKey === 'model') {
       value = value.toLowerCase();
-      if (!this.config.ai.availableModels.includes(value)) {
+      const availableModels = await this.getAvailableModels();
+      
+      if (!availableModels.includes(value)) {
         await this.client.sendMessage(
           chatId,
-          `❌ Invalid model: ${value}\n\nAvailable models: ${this.config.ai.availableModels.join(', ')}`
+          `❌ Invalid model: ${value}\n\nAvailable models: ${availableModels.join(', ')}`
         );
         return;
       }
-    } else if (key === 'systemPrompt') {
+    } else if (rawKey === 'systemPrompt') {
       // Any string is valid for systemPrompt, trim it
       value = value.trim();
     } else {
@@ -442,8 +482,8 @@ Examples:
     // Save
     try {
       const store = new SettingsStore(chatId, settingsDir);
-      await store.update(key, value);
-      await this.client.sendMessage(chatId, `✓ Settings updated: ${key} set.`);
+      await store.update(rawKey, value); // Use raw key for storage
+      await this.client.sendMessage(chatId, `✓ Settings updated: ${key} set.`); // Use safe key for display
     } catch (err) {
       this.logger.error(`Error saving setting ${key} for user ${chatId}`, err);
       await this.client.sendMessage(chatId, `❌ Failed to update setting: ${key}`);
@@ -483,7 +523,7 @@ Examples:
       const messages = await store.loadHistory(chatId, 10);
       
       if (!messages || messages.length === 0) {
-        await this.client.sendMessage(chatId, '📜 Your conversation history is empty.\n\nStart by asking: /ask <question>');
+        await this.client.sendMessage(chatId, '📜 Your conversation history is empty.\n\nStart by asking: /ask &lt;question&gt;');
         return;
       }
       
@@ -546,12 +586,12 @@ Default Model: ${this.config.ai.defaultModel}
   async handleShellCommand(context) {
     const { chatId, username, args } = context;
     const MAX_OUTPUT = 3500; // Telegram safe size
+    const whitelist = this.config.security.shCommandWhitelist;
     if (args.length === 0) {
-      await this.client.sendMessage(chatId, '❌ Usage: /sh <command>');
+      await this.client.sendMessage(chatId, '❌ Usage: /sh &lt;command&gt; \nAvaliable commands:\n'+whitelist.join('\n'));
       return;
     }
     const command = args.join(' ');
-    const whitelist = this.config.security.shCommandWhitelist;
     const firstWord = args[0].toLowerCase();
     if (whitelist.length > 0 && !whitelist.includes(firstWord)) {
       this.logAuditAction(chatId, username, '/sh', command, 'DENIED', 'Command not whitelisted');
@@ -589,13 +629,16 @@ Default Model: ${this.config.ai.defaultModel}
   async handleAgentCommand(context) {
     const { chatId, username, args } = context;
     if (args.length === 0) {
-      await this.client.sendMessage(chatId, '❌ Usage: /agent <prompt>');
+      await this.client.sendMessage(chatId, '❌ Usage: /agent &lt;prompt&gt;');
       return;
     }
     const prompt = args.join(' ');
     await this.client.sendChatAction(chatId, 'typing');
     // Placeholder: echo prompt, in real use would call AI agent
-    const response = `🤖 [Agent] Prompt received:\n${prompt}\n\n(This is a placeholder. Integrate with agent logic as needed.)`;
+    const response = `🤖 [Agent] Prompt received:\n${prompt}\n\n(This is a placeholder. Integrate with agent logic as needed.)`
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     await this.client.sendMessage(chatId, response);
     this.logAuditAction(chatId, username, '/agent', prompt, 'EXECUTED', null);
   }
@@ -622,6 +665,28 @@ Default Model: ${this.config.ai.defaultModel}
     } else {
       this.logger.info(logEntry);
     }
+  }
+
+  /**
+   * Get all available models (configured + dynamic)
+   */
+  async getAvailableModels() {
+    let dynamicModels = [];
+    if (this.fallbackChain && typeof this.fallbackChain.listModels === 'function') {
+      try {
+        dynamicModels = await this.fallbackChain.listModels();
+      } catch (err) {
+        this.logger.warn('Failed to fetch dynamic models', err);
+      }
+    }
+    
+    // If we have dynamic models (from Ollama/OpenAI), use them as the source of truth
+    if (dynamicModels.length > 0) {
+      return Array.from(new Set(dynamicModels));
+    }
+
+    // Fallback to config if discovery failed completely
+    return Array.from(new Set(this.config.ai.availableModels));
   }
 }
 

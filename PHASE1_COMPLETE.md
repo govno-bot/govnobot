@@ -135,7 +135,7 @@ TELEGRAM_GOVNOBOT_TOKEN=your_token_here
 TELEGRAM_ADMIN_USERNAME=your_username
 TELEGRAM_ADMIN_CHATID=your_chat_id
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama2
+OLLAMA_MODEL=deepseek-r1:8b
 BOT_LOG_LEVEL=info
 ```
 

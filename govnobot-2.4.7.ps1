@@ -1017,7 +1017,7 @@ function Invoke-Telegram-Command {
         "/stats - Bot statistics`n" +
         "/status - Bot health status`n" +
         "/history [n] - Show last n messages (default: 5)`n" +
-        "/model [name] - Switch AI model (llama2, mistral, neural-chat)`n" +
+        "/model [name] - Switch AI model (deepseek-r1:8b, mistral, neural-chat)`n" +
         "/settings - Show your settings`n" +
         "/ttt - Play Tic-Tac-Toe`n" +
         "/cache - Cache management (admin)`n" +

@@ -422,7 +422,7 @@ class MockOllamaAPI {
     this.failNext = true;
   }
   
-  async generate(prompt, model = 'llama2') {
+  async generate(prompt, model = 'deepseek-r1:8b') {
     if (this.failNext) {
       this.failNext = false;
       throw new Error('Ollama service unavailable');
@@ -504,7 +504,7 @@ const testFixtures = {
   
   validSettings: {
     systemPrompt: 'You are a helpful assistant.',
-    model: 'llama2',
+    model: 'deepseek-r1:8b',
     maxHistoryContext: 5
   },
   
@@ -684,7 +684,7 @@ Feature: Admin action audit trail
 ```json
 {
   "systemPrompt": "You are a helpful assistant.",
-  "model": "llama2",
+  "model": "deepseek-r1:8b",
   "maxHistoryContext": 5,
   "createdAt": "2025-12-31T10:00:00Z",
   "updatedAt": "2025-12-31T14:00:00Z"
@@ -731,8 +731,8 @@ TELEGRAM_ADMIN_CHATID=123456789
 # Optional
 OPENAI_API_KEY=<api key>
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama2
-AVAILABLE_MODELS=llama2,mistral,neural-chat,dolphin-mixtral
+OLLAMA_MODEL=deepseek-r1:8b
+AVAILABLE_MODELS=deepseek-r1:8b,mistral,neural-chat,dolphin-mixtral
 
 # Bot Configuration
 BOT_POLL_INTERVAL=30000
@@ -1127,7 +1127,7 @@ Feature: Complete user conversation workflow
     Given user sends /start
     When user sends /ask "First question"
     And user sends /ask "What about X?"
-    And user switches model with /model llama2
+    And user switches model with /model deepseek-r1:8b
     And user views history with /history
     Then all interactions are saved
     And context is preserved across messages
