@@ -1,485 +1,110 @@
-# GovnoBot Node.js - TODO & Roadmap
+# 🚀 GovnoBot: A Roadmap to Slightly Less Inevitable Doom 🚀
 
-**Current Phase:** 1.1 ✅ Complete  
-**Next Phase:** 1.2 🔄 In Progress  
-**Last Updated:** 2025-12-31
+**Last Updated:** 2026-03-05
 
----
-
-## 🎯 Immediate Next Steps (Phase 1.2)
-
-### 1. Logger Module
-
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 2-3 hours
-
-#### Tasks
-- [ ] Write test file: `test/unit/logger.test.js` (10+ tests)
-  - [ ] Test log levels (debug, info, warn, error)
-  - [ ] Test file output
-  - [ ] Test console output
-  - [ ] Test timestamp formatting
-  - [ ] Test structured logging (JSON)
-  - [ ] Test log rotation (optional)
-  - [ ] Test log level filtering
-  - [ ] Test error stack traces
-  - [ ] Test metadata inclusion
-  - [ ] Test concurrent logging
-  
-- [ ] Implement `src/utils/logger.js`
-  - [ ] Multiple log levels
-  - [ ] File and console output
-  - [ ] Timestamp formatting
-  - [ ] Structured logging support
-  - [ ] Configurable output format
-
-#### Acceptance Criteria
-- ✅ 10+ tests passing
-- ✅ Logs to file and console
-- ✅ Different log levels work
-- ✅ Timestamps are formatted correctly
-- ✅ Zero external dependencies
+This document outlines the path forward for GovnoBot. The core is stable, but the future is a minefield of complexity, user abuse, and technical debt. This roadmap acknowledges the crushing reality of software development and attempts to navigate it with a healthy dose of paranoid pessimism.
 
 ---
 
-### 2. File Lock Module
+## 🏆 The Hall of Legends (Previously Conquered) 🏆
 
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 2-3 hours
+A brief, futile acknowledgment of past efforts. A stable foundation built on TDD and zero dependencies.
 
-#### Tasks
-- [ ] Write test file: `test/unit/file-lock.test.js` (8+ tests)
-  - [ ] Test lock acquisition
-  - [ ] Test lock release
-  - [ ] Test concurrent access prevention
-  - [ ] Test timeout handling
-  - [ ] Test stale lock cleanup
-  - [ ] Test process ID tracking
-  - [ ] Test lock directory creation
-  - [ ] Test error handling
-  
-- [ ] Implement `src/storage/file-lock.js`
-  - [ ] Acquire lock with PID
-  - [ ] Release lock
-  - [ ] Timeout mechanism
-  - [ ] Stale lock detection
-  - [ ] Atomic operations
+- **Core Infrastructure:** Test suite, utilities, and persistent storage are complete.
+- **AI & API Integration:** Telegram API mastered; multiple AI providers integrated.
+- **Command & Docs:** A full suite of commands and comprehensive documentation exist.
 
-#### Acceptance Criteria
-- ✅ 8+ tests passing
-- ✅ Prevents concurrent writes
-- ✅ Handles stale locks
-- ✅ Timeout works correctly
-- ✅ Zero external dependencies
+**Test Status:** 27 files, 200+ assertions. ✅ All Passing. A brief respite before the chaos.
 
 ---
 
-### 3. Error Handler Module
+## ⚠️ The Abyss: Risks & Realities ⚠️
 
-**Priority:** Medium  
-**Status:** Not Started  
-**Estimated:** 2 hours
+A section dedicated to everything that will, and probably already has, started to go wrong.
 
-#### Tasks
-- [ ] Write test file: `test/unit/error-handler.test.js` (8+ tests)
-  - [ ] Test error wrapping
-  - [ ] Test user-friendly messages
-  - [ ] Test stack trace handling
-  - [ ] Test error logging
-  - [ ] Test recovery strategies
-  - [ ] Test error categorization
-  - [ ] Test context preservation
-  - [ ] Test async error handling
-  
-- [ ] Implement `src/utils/error-handler.js`
-  - [ ] Graceful error recovery
-  - [ ] User-friendly messages
-  - [ ] Error logging with context
-  - [ ] Stack trace formatting
-  - [ ] Recovery strategies
-
-#### Acceptance Criteria
-- ✅ 8+ tests passing
-- ✅ Errors are user-friendly
-- ✅ Context is preserved
-- ✅ Logging integration works
-- ✅ Zero external dependencies
+-   **Technical Risks:**
+    -   **Telegram API Limits:** Rate limiting on message edits, image uploads, and API calls will complicate features like streaming.
+    -   **State Management:** Stateful features (games, reminders) add significant complexity around persistence and restart safety.
+    -   **"Zero Dependency" Dogma:** Sticking to this principle for features like image/audio processing will lead to re-implementing large parts of npm, a truly Sisyphean task.
+-   **Operational Concerns:**
+    -   **Scalability:** A single-instance, polling-based architecture will not scale.
+    -   **Monitoring:** Lack of a health check endpoint and error telemetry means we are flying blind.
+    -   **Moderation:** Without robust anti-spam, rate limiting, and user banning, the bot will be quickly overwhelmed by abuse.
+-   **AI Cost & Performance:**
+    -   **Context Windows:** Unmanaged context will lead to exponential increases in token usage and cost.
+    -   **Latency:** Features like image generation and voice transcription introduce significant, user-facing delays that require queuing and feedback systems.
 
 ---
 
-## 📋 Phase 2: Storage & Persistence
+## 💎 The Treasure Chest: A Prioritized Plan for Future Suffering 💎
 
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 1 week
+A revised feature list, re-prioritized based on a grim acceptance of user needs and technical feasibility.
 
-### 2.1 History Store
+### ⭐ Tier 1: The Foundational Pillars ⭐
 
-- [ ] Write tests: `test/unit/history-store.test.js`
-- [ ] Implement: `src/storage/history-store.js`
-  - [ ] Save user messages
-  - [ ] Load conversation history
-  - [ ] Get context for AI
-  - [ ] Clear history
-  - [ ] Concurrent access with file lock
+*Critical features required for a robust and usable bot. These are not optional.*
 
-### 2.2 Settings Store
+-   [ ] **Advanced Moderation & Safety:**
+    -   **Description:** Implement a full suite of moderation tools: granular command cooldowns (per-user, per-chat, per-command), prompt filtering, user ban lists, and anti-spam measures.
+    -   **Justification:** A bot without moderation is a magnet for chaos. This is a prerequisite for public use.
+-   [ ] **AI Streaming & Response Handling:**
+    -   **Description:** Show AI responses as they generate.
+    -   **Implementation Plan:** Investigate and choose a strategy: progressive message edits (with rate limit awareness), chunk buffering, or a simple "typing" indicator (e.g., `▌`).
+-   [ ] **Scheduled Messages & Reminders:**
+    -   **Description:** Implement a `/remind <time> <message>` command.
+    -   **Technical Needs:** Requires a persistent, restart-safe background scheduler and robust timezone handling.
+-   [ ] **Smarter Conversation Context:**
+    -   **Description:** Implement a configurable context window strategy.
+    -   **Implementation Plan:** Start with a simple "last N messages" approach, with plans for summary memory and pinned system context.
+-   [ ] **Health Check & Error Telemetry:**
+    -   **Description:** Add a production-ready `/health` endpoint and commands for viewing logs (`/logs`) and error reports.
+    -   **Justification:** A bot that cannot report its own status is already dead.
 
-- [ ] Write tests: `test/unit/settings-store.test.js`
-- [ ] Implement: `src/storage/settings-store.js`
-  - [ ] Save user settings
-  - [ ] Load user settings
-  - [ ] Update settings
-  - [ ] Default values
-  - [ ] Validation
+### 🎲 Tier 2: High-Impact Engagement 🎲
 
-### 2.3 Backup Manager
+*Features that dramatically increase the bot's utility and "fun," whatever that is.*
 
-- [ ] Write tests: `test/unit/backup-manager.test.js`
-- [ ] Implement: `src/storage/backup-manager.js`
-  - [ ] Create timestamped backups
-  - [ ] Compress with zlib
-  - [ ] List available backups
-  - [ ] Restore from backup
-  - [ ] Retention policy (keep last N)
+-   [ ] **Proactive Agent Mode:**
+    -   **Description:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood."
+    -   **Justification:** Transforms the bot from a reactive tool into a proactive companion, creating a more dynamic and engaging experience.
+    -   **Technical Needs:** Requires a sophisticated trigger mechanism (event-driven or scheduled), contextual awareness (user history, external data), robust user controls to disable/configure the feature, and state management to avoid spamming.
+-   [ ] **Conversation Personalities:**
+    -   **Description:** Allow users to set the bot's personality (e.g., `/persona pirate`, `/persona therapist`).
+    -   **Justification:** High replay value for low implementation cost compared to complex games.
+-   [ ] **Image Generation (with proper architecture):**
+    -   **Description:** `/imagine <prompt>` command.
+    -   **Technical Needs:** Requires a job queue system, progress feedback to the user, timeout handling, and a strategy for GPU requirements (or offloading to an API). Acknowledge that this may require an external dependency.
+-   [ ] **Voice Message Transcription:**
+    -   **Description:** Transcribe user voice messages and feed them to the AI.
+    -   **Technical Needs:** Requires a processing pipeline: download OGG/OPUS file -> convert -> transcribe (e.g., via Whisper API) -> respond.
+-   [ ] **Inline AI Queries:**
+    -   **Description:** Allow the bot to respond when mentioned directly in a chat without a command prefix.
+    -   **Technical Needs:** Requires robust mention detection, context extraction, and spam filtering to prevent it from replying to everything.
 
----
+### 🛠️ Tier 3: The Long, Dark Road to Polish 🛠️
 
-## 🔒 Phase 3: Security
+*Good ideas that can wait until the foundational fires are put out.*
 
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 1 week
-
-### 3.1 Rate Limiter
-
-- [ ] Write feature: `test/features/rate-limiting.feature`
-- [ ] Write acceptance: `test/acceptance/rate-limit-enforcement.test.js`
-- [ ] Write unit tests: `test/unit/rate-limiter.test.js`
-- [ ] Implement: `src/security/rate-limiter.js`
-  - [ ] Per-user rate limiting
-  - [ ] Per-minute limits
-  - [ ] Per-hour limits
-  - [ ] Reset tracking
-  - [ ] Quota checking
-
-### 3.2 Admin Validator
-
-- [ ] Write tests: `test/unit/admin-validator.test.js`
-- [ ] Implement: `src/security/admin-validator.js`
-  - [ ] Username validation
-  - [ ] Chat ID validation
-  - [ ] IP whitelist checking
-  - [ ] IP blacklist checking
-  - [ ] Clear error messages
-
-### 3.3 Crypto Utils
-
-- [ ] Write tests: `test/unit/crypto-utils.test.js`
-- [ ] Implement: `src/security/crypto-utils.js`
-  - [ ] Sign audit log entries
-  - [ ] Verify signatures
-  - [ ] HMAC-SHA256 implementation
-  - [ ] Handle missing keys
+-   [ ] **Plugin/Addon Architecture:**
+    -   **Description:** Refactor features like games and meme generators into a modular plugin system.
+    -   **Justification:** The only sane path to long-term growth and external contributions. A legendary bot is a platform.
+-   [ ] **Game Master Mode (Phased Approach):**
+    -   **Phase 1:** Stateless, improv storytelling (`/gm <scenario>`).
+    -   **Phase 2:** A stateful campaign system with persistence.
+-   [ ] **Generic Game Framework:**
+    -   **Description:** Instead of a one-off `/ttt` command, build a framework for turn-based games (`/game start ttt`, `/game move c2`).
+-   [ ] **Capability-Based Model Aliases:**
+    -   **Description:** Create aliases that describe model capabilities (e.g., `/model fast`, `/model smart`) instead of just names.
+-   [ ] **Admin Analytics Dashboard:**
+    -   **Description:** A simple `/stats <period>` command based on structured log aggregation.
 
 ---
 
-## 📡 Phase 4: Telegram API
+## 📜 The Developer's Creed (Revised) 📜
 
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 1-2 weeks
+1.  **TDD is Law:** The only shield against the darkness.
+2.  **No *Unnecessary* Bloat:** Stick to the standard library, but do not reimplement `ffmpeg` in pure JavaScript. Acknowledge when a dependency is the lesser of two evils.
+3.  **Commit Small, Win Small:** Each commit is a tiny victory against the encroaching entropy.
+4.  **Document the Misery:** So that others may learn from our suffering.
 
-### 4.1 Telegram API Client
-
-- [ ] Write mocks: `test/mocks/telegram-api.mock.js`
-- [ ] Write tests: `test/unit/telegram-api-client.test.js`
-- [ ] Write acceptance: `test/acceptance/telegram-polling.test.js`
-- [ ] Implement: `src/telegram/api-client.js`
-  - [ ] HTTP client (no axios!)
-  - [ ] getUpdates endpoint
-  - [ ] sendMessage endpoint
-  - [ ] editMessage endpoint
-  - [ ] Message chunking integration
-  - [ ] Error handling with exponential backoff
-
-### 4.2 Polling Loop
-
-- [ ] Write tests: `test/unit/polling.test.js`
-- [ ] Write acceptance: `test/acceptance/polling-resilience.test.js`
-- [ ] Implement: `src/telegram/polling.js`
-  - [ ] Long polling (30 second timeout)
-  - [ ] Update offset tracking
-  - [ ] Error recovery
-  - [ ] Exponential backoff
-  - [ ] Graceful shutdown (SIGINT)
-
----
-
-## 🤖 Phase 5: AI Integration
-
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 1 week
-
-### 5.1 Ollama Client
-
-- [ ] Write mocks: `test/mocks/ollama-api.mock.js`
-- [ ] Write tests: `test/unit/ollama.test.js`
-- [ ] Implement: `src/ai/ollama.js`
-  - [ ] HTTP client to Ollama
-  - [ ] Generate endpoint
-  - [ ] Model selection
-  - [ ] Context handling
-  - [ ] Streaming support
-
-### 5.2 OpenAI Client
-
-- [ ] Write mocks: `test/mocks/openai-api.mock.js`
-- [ ] Write tests: `test/unit/openai.test.js`
-- [ ] Implement: `src/ai/openai.js`
-  - [ ] OpenAI API client
-  - [ ] Completion endpoint
-  - [ ] API key handling
-  - [ ] Error handling
-
-### 5.3 Fallback Chain
-
-- [ ] Write feature: `test/features/ai-fallback-chain.feature`
-- [ ] Write tests: `test/unit/fallback-chain.test.js`
-- [ ] Write acceptance: `test/acceptance/ai-fallback-chain.test.js`
-- [ ] Implement: `src/ai/fallback-chain.js`
-  - [ ] Try Ollama first
-  - [ ] Try GitHub Copilot CLI
-  - [ ] Try OpenAI API
-  - [ ] Return helpful error if all fail
-
----
-
-## 💬 Phase 6: Bot Commands
-
-**Priority:** High  
-**Status:** Not Started  
-**Estimated:** 2 weeks
-
-### 6.1 Command Handler
-
-- [ ] Write tests: `test/unit/command-handler.test.js`
-- [ ] Implement: `src/commands/command-handler.js`
-  - [ ] Route commands
-  - [ ] Parse arguments
-  - [ ] Error handling
-  - [ ] Permission checking
-
-### 6.2 Public Commands
-
-- [ ] `/start` command
-  - [ ] Tests: `test/unit/commands/start.test.js`
-  - [ ] Implementation: `src/commands/public/start.js`
-
-- [ ] `/help` command
-  - [ ] Tests: `test/unit/commands/help.test.js`
-  - [ ] Implementation: `src/commands/public/help.js`
-
-- [ ] `/ask` command (PRIORITY)
-  - [ ] Feature: `test/features/user-asks-question.feature`
-  - [ ] Acceptance: `test/acceptance/ask-command.test.js`
-  - [ ] Tests: `test/unit/commands/ask.test.js`
-  - [ ] Implementation: `src/commands/public/ask.js`
-
-- [ ] `/fix` command
-  - [ ] Feature: `test/features/user-fixes-code.feature`
-  - [ ] Acceptance: `test/acceptance/fix-command.test.js`
-  - [ ] Tests: `test/unit/commands/fix.test.js`
-  - [ ] Implementation: `src/commands/public/fix.js`
-
-- [ ] `/history` command
-- [ ] `/model` command
-- [ ] `/settings` command
-- [ ] `/stats` command
-- [ ] `/status` command
-- [ ] `/version` command
-
-### 6.3 Admin Commands
-
-- [ ] `/sh` command
-  - [ ] Feature: `test/features/admin-executes-shell.feature`
-  - [ ] Acceptance: `test/acceptance/sh-command.test.js`
-  - [ ] Tests: `test/unit/commands/sh.test.js`
-  - [ ] Implementation: `src/commands/admin/sh.js`
-  - [ ] Whitelist enforcement
-  - [ ] Audit logging
-
-- [ ] `/agent` command
-  - [ ] Feature: `test/features/admin-multi-step-task.feature`
-  - [ ] Tests: `test/unit/commands/agent.test.js`
-  - [ ] Implementation: `src/commands/admin/agent.js`
-
----
-
-## 🧪 Phase 7: Integration & E2E
-
-**Priority:** Medium  
-**Status:** Not Started  
-**Estimated:** 1 week
-
-### Tasks
-
-- [ ] Write acceptance tests for complete workflows
-  - [ ] User conversation flow
-  - [ ] Admin command flow
-  - [ ] Error recovery flow
-  - [ ] Rate limiting enforcement
-
-- [ ] Write integration tests
-  - [ ] End-to-end message handling
-  - [ ] Storage persistence
-  - [ ] AI integration
-  - [ ] Command processing
-
-- [ ] Performance testing
-  - [ ] Response time measurements
-  - [ ] Memory usage profiling
-  - [ ] Concurrent user simulation
-
----
-
-## 📚 Phase 8: Documentation
-
-**Priority:** Medium  
-**Status:** Not Started  
-**Estimated:** 1 week
-
-### Tasks
-
-- [ ] Generate `ARCHITECTURE.md` from code
-- [ ] Generate `API.md` from JSDoc comments
-- [ ] Create `TEST-STRATEGY.md`
-- [ ] Create `FEATURE-SPECIFICATIONS.md` from .feature files
-- [ ] Create `DEPLOYMENT.md` production guide
-- [ ] Update `CONTRIBUTING.md` with TDD workflow
-- [ ] Create video tutorial (optional)
-- [ ] Create architecture diagrams (optional)
-
----
-
-## 🎨 Nice to Have (Future)
-
-**Priority:** Low  
-**Status:** Not Planned Yet
-
-- [ ] Inline buttons for common actions
-- [ ] Voice message support
-- [ ] Image generation (`/imagine` command)
-- [ ] Web dashboard
-- [ ] Prometheus metrics export
-- [ ] Docker containerization
-- [ ] CI/CD pipeline
-- [ ] Automated deployment
-- [ ] Multi-language support
-- [ ] Plugin system
-
----
-
-## 📊 Progress Tracking
-
-### Overall Progress
-
-- [x] Phase 1.1 - Test Infrastructure ✅ **COMPLETE**
-- [ ] Phase 1.2 - Core Utilities (🔄 0/3 modules)
-- [ ] Phase 2 - Storage (⏳ 0/3 modules)
-- [ ] Phase 3 - Security (⏳ 0/3 modules)
-- [ ] Phase 4 - Telegram API (⏳ 0/2 modules)
-- [ ] Phase 5 - AI Integration (⏳ 0/3 modules)
-- [ ] Phase 6 - Bot Commands (⏳ 0/12 commands)
-- [ ] Phase 7 - Integration Tests (⏳ Not started)
-- [ ] Phase 8 - Documentation (⏳ Not started)
-
-### Test Count Target
-
-| Phase | Target Tests | Current | Status |
-|-------|-------------|---------|--------|
-| 1.1 | 20 | 20 | ✅ Complete |
-| 1.2 | 26+ | 0 | 🔄 Next |
-| 2 | 30+ | 0 | ⏳ Planned |
-| 3 | 25+ | 0 | ⏳ Planned |
-| 4 | 20+ | 0 | ⏳ Planned |
-| 5 | 20+ | 0 | ⏳ Planned |
-| 6 | 50+ | 0 | ⏳ Planned |
-| 7 | 20+ | 0 | ⏳ Planned |
-| **Total** | **211+** | **20** | **9.5%** |
-
----
-
-## 🎯 Milestones
-
-### Milestone 1: Foundation (Phase 1) ✅
-- ✅ Test infrastructure
-- 🔄 Core utilities (in progress)
-
-**Completion:** 66% (2/3 modules)
-
-### Milestone 2: Data Layer (Phase 2)
-- ⏳ Storage modules
-- ⏳ Persistence
-
-**Target Date:** Week 2
-
-### Milestone 3: API Integration (Phases 3-4)
-- ⏳ Security
-- ⏳ Telegram API
-
-**Target Date:** Week 4
-
-### Milestone 4: AI & Commands (Phases 5-6)
-- ⏳ AI integration
-- ⏳ Bot commands
-
-**Target Date:** Week 7
-
-### Milestone 5: Production Ready (Phases 7-8)
-- ⏳ Integration tests
-- ⏳ Documentation
-
-**Target Date:** Week 9
-
----
-
-## 📝 Notes
-
-### Development Principles
-
-1. **TDD Always** - Write tests first, no exceptions
-2. **Zero Dependencies** - Use only Node.js standard library
-3. **Small Commits** - Commit after each passing test
-4. **Document As You Go** - Update docs with each module
-5. **Run Tests Frequently** - After every change
-
-### Code Review Checklist
-
-Before committing:
-- [ ] All tests pass
-- [ ] New tests added for new features
-- [ ] JSDoc comments on all functions
-- [ ] No console.log (use logger)
-- [ ] Error handling implemented
-- [ ] Edge cases covered
-
-### Performance Targets
-
-- Startup time: < 500ms
-- Memory usage: < 100MB
-- Response time: < 2s (avg)
-- Test execution: < 10s (full suite)
-
----
-
-**Last Updated:** 2025-12-31  
-**Next Review:** After Phase 1.2 completion  
-**Methodology:** TDD/BDD/ADD
-
----
-
-*Keep this file updated as we progress!*
+*The bot is functional. The future is an exercise in managing complexity and staving off obsolescence.*
