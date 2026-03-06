@@ -82,10 +82,136 @@ class OpenAIClient {
    * @returns {Promise<string[]>}
    */
   async listModels() {
-    if (this.apiKey) {
-      return [this.model];
-    }
-    return [];
+    return [{ id: this.model, provider: this.name }];
+  }
+
+  /**
+   * Generate an image using DALL-E
+   * @param {string} prompt - The image prompt
+   * @param {Object} [options] - Additional options
+   * @returns {Promise<string>} Image URL
+   */
+  async generateImage(prompt, options = {}) {
+    const url = new URL('/v1/images/generations', this.baseUrl);
+    const body = JSON.stringify({
+      model: options.model || 'dall-e-3',
+      prompt,
+      n: 1,
+      size: options.size || '1024x1024'
+    });
+
+    const reqOpts = {
+      method: 'POST',
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'Authorization': `Bearer ${options.apiKey || this.apiKey}`
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(reqOpts, res => {
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              const json = JSON.parse(data);
+              if (json.data && json.data.length > 0 && json.data[0].url) {
+                resolve(json.data[0].url);
+              } else {
+                reject(new Error('Invalid response structure from OpenAI: ' + data));
+              }
+            } catch (err) {
+              reject(new Error('Failed to parse OpenAI response: ' + err.message));
+            }
+          } else {
+            reject(new Error(`OpenAI API Error (${res.statusCode}): ${data}`));
+          }
+        });
+      });
+
+      req.on('error', err => reject(err));
+      req.write(body);
+      req.end();
+    });
+  }
+
+  /**
+   * Transcribe audio using Whisper model
+   * @param {Buffer} audioBuffer - The audio file content
+   * @param {string} filename - Filename with extension (e.g., 'audio.ogg')
+   * @param {Object} [options]
+   * @returns {Promise<string>} transcribed text
+   */
+  async transcribeAudio(audioBuffer, filename, options = {}) {
+    const url = new URL('/v1/audio/transcriptions', this.baseUrl);
+    const boundary = `--------------------------${require('crypto').randomBytes(16).toString('hex')}`;
+    
+    // Construct multipart form data body
+    const parts = [];
+    
+    // File part
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`));
+    parts.push(audioBuffer);
+    
+    // Model part
+    parts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n`));
+    
+    // Closing boundary
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+    
+    const body = Buffer.concat(parts);
+
+    const reqOpts = {
+      method: 'POST',
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname,
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+        'Authorization': `Bearer ${options.apiKey || this.apiKey}`
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(reqOpts, res => {
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (res.statusCode >= 400 || parsed.error) {
+              const errMsg = parsed.error ? parsed.error.message : data;
+              reject(new Error(`OpenAI API Error: ${res.statusCode} - ${errMsg}`));
+            } else {
+              resolve(parsed.text || '');
+            }
+          } catch (err) {
+            reject(new Error(`Failed to parse OpenAI response: ${err.message}`));
+          }
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+  }
+
+  /**
+   * List available models
+   * Since OpenAI API doesn't list all models in use easily,
+   * we return the configured model if API key is present.
+   * @returns {Promise<string[]>}
+   */
+  async listAvailableModels() {
+    return [{ id: this.model, provider: this.name }];
   }
 }
 

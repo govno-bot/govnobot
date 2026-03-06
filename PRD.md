@@ -6,15 +6,14 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 > **⚠️ Important:** Always make edits to `PRD.md` as the *final step* in your workflow. Ensure all implementation and testing are complete before updating this document to reflect the final, verified state of the project.
 
 ## Todo
-- [ ] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood."
-- [ ] **Scheduled Messages & Reminders:** Implement a `/remind <time> <message>` command.
-- [ ] **Health Check & Error Telemetry:** Implement `/logs` command.
-- [ ] **Conversation Personalities:** Allow users to set the bot's personality (e.g., `/persona pirate`, `/persona therapist`).
-- [ ] **Inline AI Queries:** Allow the bot to respond when mentioned directly in a chat without a command prefix.
-- [ ] **Plugin/Addon Architecture:** Refactor features like games and meme generators into a modular plugin system.
-- [ ] **Game Master Mode (Phased Approach):** Stateless, improv storytelling (`/gm <scenario>`) and a stateful campaign system.
-- [ ] **Image Generation (with proper architecture):** `/imagine <prompt>` command.
-- [ ] **Voice Message Transcription:** Transcribe user voice messages and feed them to the AI.
+- [x] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood."
+- [x] **Scheduled Messages & Reminders:** Implement a `/remind <time> <message>` command.
+- [x] **Health Check & Error Telemetry:** Implement `/logs` command.
+- [x] **Conversation Personalities:** Allow users to set the bot's personality (e.g., `/persona pirate`, `/persona therapist`).
+- [x] **Inline AI Queries:** Allow the bot to respond when mentioned directly in a chat without a command prefix.
+- [x] **Game Master Mode (Phased Approach):** Stateless, improv storytelling (`/gm <scenario>`) and a stateful campaign system.
+- [x] **Image Generation (with proper architecture):** `/imagine <prompt>` command.
+- [x] **Voice Message Transcription:** Transcribe user voice messages and feed them to the AI.
 
 ## Implementation Status
 

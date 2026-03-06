@@ -2,7 +2,14 @@ const { chunk } = require('../utils/chunker');
 const { handleError } = require('../utils/error-handler');
 const SettingsStore = require('../storage/settings-store');
 const HistoryStore = require('../storage/history-store');
+const ReminderStore = require('../storage/reminder-store');
 const path = require('path');
+
+const remindCommand = require('./public/command-remind');
+const personaCommand = require('./public/command-persona');
+const gmCommand = require('./public/command-gm');
+const imagineCommand = require('./public/command-imagine');
+const logsCommand = require('./admin/command-logs');
 
 /**
  * Command Handler
@@ -10,14 +17,16 @@ const path = require('path');
  */
 
 class CommandHandler {
-  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger) {
+  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore) {
     this.client = client;
     this.config = config;
     this.logger = logger;
     this.rateLimiter = rateLimiter;
     this.fallbackChain = fallbackChain;
     this.auditLogger = auditLogger;
-    
+    this.reminderStore = reminderStore;
+    this.botInfo = null;
+
     // Map of commands to handler functions
     this.publicCommands = new Map();
     this.adminCommands = new Map();
@@ -43,11 +52,17 @@ class CommandHandler {
     this.registerPublicCommand('stats', this.handleStats.bind(this));
     this.registerPublicCommand('status', this.handleStatus.bind(this));
     this.registerPublicCommand('version', this.handleVersion.bind(this));
-    
-    // Admin commands
-    this.registerAdminCommand('sh', this.handleShellCommand.bind(this));
-    this.registerAdminCommand('agent', this.handleAgentCommand.bind(this));
+
+    this.registerPublicCommand(remindCommand.name, remindCommand.handler);
+    this.registerPublicCommand(personaCommand.name, personaCommand.handler);
+    this.registerPublicCommand(gmCommand.name, gmCommand.handler);
+    this.registerPublicCommand(imagineCommand.name, imagineCommand.handler);
+
+    // Admin Commands
+    this.registerAdminCommand('sh', this.handleShellCommand.bind(this));        
+    this.registerAdminCommand('agent', this.handleAgentCommand.bind(this));     
     this.registerAdminCommand('audit', this.handleAudit.bind(this));
+    this.registerAdminCommand(logsCommand.name, logsCommand.handler);
   }
 
   /**
@@ -101,21 +116,28 @@ class CommandHandler {
   }
 
   /**
+   * Set bot info obtained from Telegram API
+   */
+  setBotInfo(botInfo) {
+    this.botInfo = botInfo;
+  }
+
+  /**
    * Handle an incoming update
    */
   async handle(update) {
     if (!update.message) {
       return;
     }
-    
+
     const message = update.message;
     const chatId = message.chat.id;
     const userId = message.from.id;
     const username = message.from.username || 'unknown';
-    const text = message.text || '';
-    
+    let text = message.text || '';
+
     this.logger.debug(`Message from @${username}: ${text}`);
-    
+
     // Check rate limit
     if (this.rateLimiter && !this.rateLimiter.isAllowed(chatId)) {
       const status = this.rateLimiter.getStatus(chatId);
@@ -131,13 +153,88 @@ class CommandHandler {
       return;
     }
 
+    // Process Voice Messages
+    if (message.voice) {
+      this.logger.info(`Received voice message from user ${userId}`);
+      try {
+        await this.client.sendChatAction(chatId, 'typing');
+        const fileInfo = await this.client.getFile(message.voice.file_id);
+        const filePath = fileInfo.result.file_path;
+        const audioBuffer = await this.client.downloadFile(filePath);
+        const filename = path.basename(filePath) || 'voice.ogg';
+        
+        text = await this.fallbackChain.transcribeAudio(audioBuffer, filename);
+        if (!text || text.trim().length === 0) {
+          throw new Error('Transcription resulted in empty text');
+        }
+        
+        // Let the user know we transcribed it
+        await this.client.sendMessage(chatId, `🎤 <i>Transcript:</i> ${text}`, { parse_mode: 'HTML' });
+      } catch (err) {
+        this.logger.error(`Voice transcription failed: ${err.message}`);
+        await this.client.sendMessage(chatId, `⚠️ Failed to transcribe voice message. Please send text instead.`);
+        return;
+      }
+    }
+
+    // We proceed processing 'text' as if it was a text message
+    if (!text) return; // If it's still empty (e.g., sticker, video)
+
     // Check if message starts with a command
     if (!text.startsWith('/')) {
-      // Regular message, not a command
-      return;
-    }
-    
-    // Parse command
+      // Check for inline mention or reply
+        let isMentioned = false;
+        let query = text;
+
+        if (this.botInfo) {
+          // Check mention like @botname
+          if (this.botInfo.username) {
+            const mentionStr = `@${this.botInfo.username}`;
+            if (text.toLowerCase().includes(mentionStr.toLowerCase())) {
+              isMentioned = true;
+              query = text.replace(new RegExp(mentionStr, 'ig'), '').trim();
+            }
+          }
+          
+          // Check if it's a direct reply to the bot
+          if (!isMentioned && message.reply_to_message && message.reply_to_message.from) {
+            if (message.reply_to_message.from.id === this.botInfo.id) {
+              isMentioned = true;
+            }
+          }
+        }
+
+        if (isMentioned) {
+          const args = query ? query.split(/\s+/) : [];
+          try {
+            await this.handleAsk({
+              chatId,
+              userId,
+              username,
+              text: query,
+              command: 'ask',
+              args,
+              isAdmin: this.isAdmin(userId, username, chatId),
+              message,
+              update,
+              reminderStore: this.reminderStore,
+              telegramApiClient: this.client,
+              logger: this.logger,
+              isInlineMention: true
+            });
+          } catch (error) {
+            const userMessage = handleError(error, {
+              logger: this.logger,
+              logMessage: `Error handling inline mention query`,
+              context: { query, userId, chatId },
+              userMessage: '❌ An error occurred processing your query. Please try again later.'
+            });
+            await this.client.sendMessage(chatId, userMessage);
+          }
+        }
+        
+        return;
+      }    // Parse command
     const parts = text.split(/\s+/);
     const commandName = parts[0].substring(1).toLowerCase(); // Remove / and lowercase
     const args = parts.slice(1);
@@ -193,6 +290,11 @@ class CommandHandler {
         isAdmin,
         message,
         update,
+        reminderStore: this.reminderStore,
+        telegramApiClient: this.client,
+        logger: this.logger,
+        config: this.config,
+        fallbackChain: this.fallbackChain
       });
     } catch (error) {
       const userMessage = handleError(error, {
@@ -293,16 +395,18 @@ ${availableModels.join(', ')}
    * Handle /ask command
    */
   async handleAsk(context) {
-    const { chatId, args } = context;
-    
+    const { chatId, args, isInlineMention } = context;
+
     if (args.length === 0) {
-      await this.client.sendMessage(chatId, '❌ Usage: /ask &lt;your question&gt;');
+      if (isInlineMention) {
+        await this.client.sendMessage(chatId, '🤖 Hi! How can I help you?');
+      } else {
+        await this.client.sendMessage(chatId, '❌ Usage: /ask &lt;your question&gt;');
+      }
       return;
     }
-    
-    const question = args.join(' ');
-    
-    // Show typing indicator
+
+    const question = args.join(' ');    // Show typing indicator
     await this.client.sendChatAction(chatId, 'typing');
     
     // Save user message to history

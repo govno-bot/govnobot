@@ -22,6 +22,7 @@ async function run(runner) {
   fs.rmSync(baseDir, { recursive: true, force: true });
   fs.mkdirSync(baseDir, { recursive: true });
 
+  console.log('  Running: withFileLock acquires and releases lock');
   // Test 1: withFileLock acquires and releases lock
   {
     await withFileLock(filePath, async () => {
@@ -32,7 +33,9 @@ async function run(runner) {
     const data = await readFileLocked(filePath);
     runner.assertEqual(data, 'hello', 'data written while locked');
   }
+  console.log('  Finished: withFileLock acquires and releases lock');
 
+  console.log('  Running: concurrent access waits for lock');
   // Test 2: concurrent access waits for lock
   {
     const events = [];
@@ -56,7 +59,9 @@ async function run(runner) {
     runner.assert(firstEndIndex !== -1 && secondStartIndex !== -1, 'both callbacks executed');
     runner.assert(secondStartIndex > firstEndIndex, 'second started after first released lock');
   }
+  console.log('  Finished: concurrent access waits for lock');
 
+  console.log('  Running: stale lock is removed when older than timeout');
   // Test 3: stale lock is removed when older than timeout
   {
     fs.writeFileSync(lockPath, 'stale');
@@ -71,7 +76,9 @@ async function run(runner) {
     const data = await readFileLocked(filePath);
     runner.assertEqual(data, 'fresh', 'data written after stale lock removal');
   }
+  console.log('  Finished: stale lock is removed when older than timeout');
 
+  console.log('  Running: read/write/append helpers work with locks');
   // Test 4: read/write/append helpers work with locks
   {
     await writeFileLocked(filePath, 'part1');
@@ -82,6 +89,7 @@ async function run(runner) {
     await deleteFileLocked(filePath);
     runner.assert(!fs.existsSync(filePath), 'file removed via deleteFileLocked');
   }
+  console.log('  Finished: read/write/append helpers work with locks');
 }
 
 module.exports = { run };

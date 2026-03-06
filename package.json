@@ -23,5 +23,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "sinon": "^21.0.2"
   }
 }

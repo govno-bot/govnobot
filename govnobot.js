@@ -24,6 +24,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const ProactiveAgent = require('./src/mood/proactive-agent.js');
 
 // ============================================================================
 // Configuration
@@ -1182,6 +1183,22 @@ const main = async () => {
         log(`⚠️ Warning: Cannot connect to Ollama at ${CONFIG.ollamaUrl}`, 'WARN');
         log('   Bot will fall back to VS Code when needed', 'WARN');
       }
+    }
+
+    // Start the proactive agent
+    if (!noLoop) {
+        const proactiveAgent = new ProactiveAgent({
+            logger: {
+                info: (msg) => log(msg, 'INFO'),
+                warn: (msg) => log(msg, 'WARN'),
+                error: (msg) => log(msg, 'ERROR'),
+            },
+            telegramApiClient: {
+                sendMessage: sendTelegramMessage,
+            },
+            adminChatId: CONFIG.adminChatId,
+        });
+        proactiveAgent.start();
     }
 
     log('🚀 Bot is now running. Press Ctrl+C to stop.');

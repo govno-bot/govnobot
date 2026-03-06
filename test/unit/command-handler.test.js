@@ -109,4 +109,65 @@ module.exports.run = async function(runner) {
     
     runner.assert(sentMsg && sentMsg.includes('An error occurred processing your command'), 'Should send friendly error message on crash');
   });
+
+  await runner.test('responds to inline mentions without prefix', async () => {
+      const CommandHandler = require('../../src/commands/command-handler');
+      let handledArgs = null;
+      
+      const mockClient = { sendMessage: async () => {}, sendChatAction: async () => {} };
+      const config = { security: { shCommandWhitelist: [] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: [] }, version: '1.0.0' };
+      const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
+      
+      const handler = new CommandHandler(mockClient, config, logger, null);
+      
+      // Inject bot info
+      handler.setBotInfo({ id: 999, username: 'TestBot' });
+      
+      // Mock handleAsk to verify it gets routed correctly
+      handler.handleAsk = async (context) => {
+        handledArgs = context.args;
+      };
+      
+      // Test mentioning @TestBot
+      await handler.handle({
+        message: {
+          text: 'Hello @TestBot how are you?',
+          from: { id: 1, username: 'user' },
+          chat: { id: 1 }
+        }
+      });
+      
+      runner.assert(handledArgs !== null, 'Should have routed to handleAsk');
+      runner.assert(handledArgs.join(' ') === 'Hello how are you?', 'Should remove bot username from query');
+    });
+
+    await runner.test('responds to direct replies without prefix', async () => {
+      const CommandHandler = require('../../src/commands/command-handler');
+      let handledArgs = null;
+      
+      const mockClient = { sendMessage: async () => {}, sendChatAction: async () => {} };
+      const config = { security: { shCommandWhitelist: [] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: [] }, version: '1.0.0' };
+      const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
+      
+      const handler = new CommandHandler(mockClient, config, logger, null);
+      handler.setBotInfo({ id: 999, username: 'TestBot' });
+      handler.handleAsk = async (context) => {
+        handledArgs = context.args;
+      };
+      
+      // Test replying to bot
+      await handler.handle({
+        message: {
+          text: 'Is this working?',
+          reply_to_message: {
+            from: { id: 999, is_bot: true, username: 'TestBot' }
+          },
+          from: { id: 1, username: 'user' },
+          chat: { id: 1 }
+        }
+      });
+      
+      runner.assert(handledArgs !== null, 'Should have routed to handleAsk on reply');
+      runner.assert(handledArgs.join(' ') === 'Is this working?', 'Should pass query properly');
+    });
 };

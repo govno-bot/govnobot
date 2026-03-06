@@ -134,6 +134,27 @@ class TelegramAPIClient {
   }
 
   /**
+   * Send a photo to a chat
+   * @param {number|string} chatId - Telegram chat ID
+   * @param {string} photo - Photo URL or file_id
+   * @param {object} options - Additional options (caption, parse_mode, etc.)
+   * @returns {Promise<object>} - Response with sent message
+   */
+  async sendPhoto(chatId, photo, options = {}) {
+    if (!chatId || !photo) {
+      throw new Error('chatId and photo are required');
+    }
+    
+    const params = {
+      chat_id: chatId,
+      photo: photo,
+      ...options,
+    };
+    
+    return this.request('POST', 'sendPhoto', params);
+  }
+
+  /**
    * Edit an existing message
    * @param {number} chatId - Telegram chat ID
    * @param {number} messageId - ID of message to edit
@@ -168,10 +189,39 @@ class TelegramAPIClient {
     if (!chatId || !messageId) {
       throw new Error('chatId and messageId are required');
     }
+    return this.request('POST', 'deleteMessage', { chat_id: chatId, message_id: messageId });
+  }
+
+  /**
+   * Get file info containing file_path
+   * @param {string} fileId - The file ID
+   * @returns {Promise<object>} - File info
+   */
+  async getFile(fileId) {
+    if (!fileId) throw new Error('fileId is required');
+    return this.request('POST', 'getFile', { file_id: fileId });
+  }
+
+  /**
+   * Download file to a Buffer
+   * @param {string} filePath - The path from getFile
+   * @returns {Promise<Buffer>} - Downloaded file content
+   */
+  async downloadFile(filePath) {
+    if (!filePath) throw new Error('filePath is required');
+    const url = `https://api.telegram.org/file/bot${this.botToken}/${filePath}`;
     
-    return this.request('POST', 'deleteMessage', {
-      chat_id: chatId,
-      message_id: messageId,
+    return new Promise((resolve, reject) => {
+      https.get(url, (res) => {
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Failed to download file, status code: ${res.statusCode}`));
+        }
+        
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', reject);
+      }).on('error', reject);
     });
   }
 

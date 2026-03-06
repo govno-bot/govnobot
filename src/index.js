@@ -20,6 +20,8 @@ const AuditLogger = require('./security/audit-logger');
 const FallbackChain = require('./ai/fallback-chain');
 const OllamaClient = require('./ai/ollama');
 const OpenAIClient = require('./ai/openai');
+const ReminderStore = require('./storage/reminder-store');
+const ReminderScheduler = require('./reminder-scheduler');
 
 let logger;
 let config;
@@ -114,6 +116,10 @@ async function initialize() {
     );
     logger.info('✓ Audit logger initialized');
 
+    // Initialize reminder store
+    const reminderStore = new ReminderStore(logger);
+    logger.info('✓ Reminder store initialized');
+
     // Initialize command handler
     commandHandler = new CommandHandler(
       client,
@@ -121,9 +127,15 @@ async function initialize() {
       logger,
       rateLimiter,
       fallbackChain,
-      auditLogger
+      auditLogger,
+      reminderStore
     );
     logger.info('✓ Command handler initialized');
+    
+    // Initialize and start reminder scheduler
+    const reminderScheduler = new ReminderScheduler(reminderStore, client, logger);
+    reminderScheduler.start();
+    logger.info('✓ Reminder scheduler started');
     
     // Create data directories if they don't exist
     ensureDataDirectories();
@@ -209,6 +221,17 @@ async function handleUpdate(update) {
  */
 async function start() {
   try {
+    // Get bot info
+    try {
+      const botMe = await client.getMe();
+      if (botMe && botMe.result && botMe.result.username) {
+        commandHandler.setBotInfo(botMe.result);
+        logger.info(`🤖 Bot Username: @${botMe.result.username}`);
+      }
+    } catch (err) {
+      logger.warn('Could not fetch bot info from Telegram API', err);
+    }
+
     logger.info('🔄 Starting polling loop...');
     await startPolling(client, handleUpdate, {
       pollInterval: config.telegram.pollInterval,
