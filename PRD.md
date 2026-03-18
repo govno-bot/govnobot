@@ -6,7 +6,10 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 > **⚠️ Important:** Always make edits to `PRD.md` as the *final step* in your workflow. Ensure all implementation and testing are complete before updating this document to reflect the final, verified state of the project.
 
 ## Todo
-- [x] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood."
+- [x] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood." (Fixed missing initialization in entry point).
+- [x] **Advanced Agentic Loop:** Implement a continuous, self-prompting evaluation loop where the bot formulates its own goals, checks constraints, and queries the environment or users without explicit prompting.
+- [x] **Notepad & Todo-List Memory:** Give the bot a scratchpad / todo-list to persist its running thoughts, planned autonomous actions, and multi-step reasoning across polling/restart cycles.
+- [x] **Self-Reflection & Task Breakdown:** When given an ambiguous goal, the bot uses its notepad to break down the task, schedule execution via the reminder/scheduler subsystem, and follow up proactively.
 - [x] **Scheduled Messages & Reminders:** Implement a `/remind <time> <message>` command.
 - [x] **Health Check & Error Telemetry:** Implement `/logs` command.
 - [x] **Conversation Personalities:** Allow users to set the bot's personality (e.g., `/persona pirate`, `/persona therapist`).
@@ -42,6 +45,9 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 - [x] Write Integration & E2E Tests (Phase 7)
 - [x] Complete Documentation Phase (ARCHITECTURE.md, API.md, TEST-STRATEGY.md, etc.)
 - [x] Verify admin notifications (Env vars: TELEGRAM_GOVNOBOT_TOKEN, etc.)
+
+## Bug Fixes
+- [x] **Proactive Agent Initialization:** Fixed a bug where `ProactiveAgent` was completely missing from the new `src/index.js` entry point. Even though the module was fully implemented, it was silently ignored during start-up, resulting in 24h+ runs with no signs of proactive behavior. The agent is now properly instantiated with `config.telegram.adminChatId` and started concurrently with the bot's scheduled background jobs.
 
 ## Technical Details
 

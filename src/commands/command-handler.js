@@ -17,7 +17,7 @@ const logsCommand = require('./admin/command-logs');
  */
 
 class CommandHandler {
-  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore) {
+  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore, notepadStore) {
     this.client = client;
     this.config = config;
     this.logger = logger;
@@ -25,6 +25,7 @@ class CommandHandler {
     this.fallbackChain = fallbackChain;
     this.auditLogger = auditLogger;
     this.reminderStore = reminderStore;
+    this.notepadStore = notepadStore;
     this.botInfo = null;
 
     // Map of commands to handler functions
@@ -738,8 +739,23 @@ Default Model: ${this.config.ai.defaultModel}
     }
     const prompt = args.join(' ');
     await this.client.sendChatAction(chatId, 'typing');
-    // Placeholder: echo prompt, in real use would call AI agent
-    const response = `🤖 [Agent] Prompt received:\n${prompt}\n\n(This is a placeholder. Integrate with agent logic as needed.)`
+    
+    let response = `🤖 [Agent] Goal added:\n${prompt}`;
+    try {
+      if (this.notepadStore) {
+        const notepad = await this.notepadStore.load();
+        const goals = Array.isArray(notepad.goals) ? notepad.goals : [];
+        goals.push(prompt);
+        await this.notepadStore.update({ goals });
+      } else {
+        response = `⚠️ Warning: notepadStore not available. Goal was not saved.`;
+      }
+    } catch (err) {
+      this.logger.error('Failed to update notepad for /agent command', err);
+      response = `❌ Failed to save goal to agent notepad.`;
+    }
+
+    response = response
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");

@@ -21,7 +21,10 @@ const FallbackChain = require('./ai/fallback-chain');
 const OllamaClient = require('./ai/ollama');
 const OpenAIClient = require('./ai/openai');
 const ReminderStore = require('./storage/reminder-store');
+const NotepadStore = require('./storage/notepad-store');
 const ReminderScheduler = require('./reminder-scheduler');
+const ProactiveAgent = require('./mood/proactive-agent');
+const AgenticLoop = require('./ai/agentic-loop');
 
 let logger;
 let config;
@@ -118,7 +121,11 @@ async function initialize() {
 
     // Initialize reminder store
     const reminderStore = new ReminderStore(logger);
-    logger.info('✓ Reminder store initialized');
+    logger.info('✅ Reminder store initialized');
+
+    // Initialize notepad store
+    const notepadStore = new NotepadStore(config.dataDir);
+    logger.info('✅ Notepad store initialized');
 
     // Initialize command handler
     commandHandler = new CommandHandler(
@@ -128,15 +135,41 @@ async function initialize() {
       rateLimiter,
       fallbackChain,
       auditLogger,
-      reminderStore
+      reminderStore,
+      notepadStore
     );
-    logger.info('✓ Command handler initialized');
-    
+    logger.info('✅ Command handler initialized');
+
     // Initialize and start reminder scheduler
     const reminderScheduler = new ReminderScheduler(reminderStore, client, logger);
     reminderScheduler.start();
     logger.info('✓ Reminder scheduler started');
-    
+
+    // Initialize and start proactive agent
+    const proactiveAgent = new ProactiveAgent({
+      logger,
+      telegramApiClient: client,
+      adminChatId: config.telegram.adminChatId,
+      fallbackChain,
+      notepadStore,
+      historyStore: undefined // Note: historyStore was undefined here previously
+    });
+    proactiveAgent.start();
+    logger.info('✓ Proactive agent started');
+
+    // Initialize and start Advanced Agentic Loop
+    const agenticLoop = new AgenticLoop({
+      logger,
+      telegramApiClient: client,
+      adminChatId: config.telegram.adminChatId,
+      fallbackChain,
+      notepadStore,
+      reminderStore,
+      historyStore: undefined
+    });
+    agenticLoop.start();
+    logger.info('✓ Advanced Agentic Loop started');
+
     // Create data directories if they don't exist
     ensureDataDirectories();
     

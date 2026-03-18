@@ -68,26 +68,35 @@ const run = (runner) => {
             runner.assert(agent.moods.includes(agent.currentMood), 'mood should be one of the available moods');
         },
 
-        'should generate a message based on mood': () => {
-            const agent = new ProactiveAgent({ logger: createMockLogger() });
+        'should generate a message based on mood': async () => {
+            const fallbackChain = {
+                call: async () => `{"notepad": "updating notes", "message": "I'm feeling a bit mischievous!"}`
+            };
+            const mockNotepadStore = {
+                load: async () => ({ notes: "" }),
+                update: async () => {}
+            };
+            const agent = new ProactiveAgent({ logger: createMockLogger(), fallbackChain, notepadStore: mockNotepadStore });
             agent.currentMood = 'playful';
-            const message = agent.generateMessage();
-            const playfulMessages = [
-                "I'm feeling a bit mischievous! Want to hear a joke?",
-                "Let's play a game! Two truths and a lie: I can't dream, I'm powered by electricity, I have a favorite color. Which is the lie?",
-                "If I were a cat, I'd be a very curious one. Meow! What's new?"
-            ];
-            runner.assert(playfulMessages.includes(message), 'should generate a playful message');
+            const message = await agent.generateMessage();
+            runner.assertEqual(message, "I'm feeling a bit mischievous!", 'should generate a playful message');
         },
 
         'should send a proactive message': async () => {
             const logger = createMockLogger();
             const telegramApiClient = createMockTelegramApiClient();
             const adminChatId = '12345';
-            const agent = new ProactiveAgent({ logger, telegramApiClient, adminChatId });
+            const mockNotepadStore = {
+                load: async () => ({ notes: "" }),
+                update: async () => {}
+            };
+            const fallbackChain = {
+                call: async () => `{"notepad": "updating notes", "message": "I feel happy!"}`
+            };
+            const agent = new ProactiveAgent({ logger, telegramApiClient, adminChatId, fallbackChain, notepadStore: mockNotepadStore });
 
             agent.currentMood = 'happy';
-            const message = agent.generateMessage();
+            const message = await agent.generateMessage();
             await agent.sendMessage(message);
 
             const sentMessages = telegramApiClient.getMessages();

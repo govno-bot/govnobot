@@ -103,7 +103,16 @@ class OllamaClient {
    * Adapter for FallbackChain
    */
   async call(prompt, options) {
-    return this.generate(prompt, options);
+    let promptString = prompt;
+    if (Array.isArray(prompt)) {
+      promptString = prompt.map(m => {
+        if (m.role === 'system') return `System: ${m.content}`;
+        if (m.role === 'user') return `User: ${m.content}`;
+        if (m.role === 'assistant') return `Assistant: ${m.content}`;
+        return m.content;
+      }).join('\n\n');
+    }
+    return this.generate(promptString, options);
   }
 }
 

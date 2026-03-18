@@ -29,20 +29,24 @@ module.exports.run = async function(runner) {
       runner.assert(sentMessage && sentMessage.includes('restricted'), 'Should return admin error for /sh as non-admin');
     });
 
-    await runner.test('/agent as admin echoes prompt', async () => {
-      const CommandHandler = require('../../src/commands/command-handler');
-      let sentMessage = null;
-      const fakeClient = {
-        sendMessage: async (chatId, msg) => { sentMessage = msg; },
-        sendChatAction: async () => {}
-      };
-      const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: '1.0.0' };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null);
-      await handler.handle({ message: { text: '/agent hello world', from: { id: 1, username: 'admin' }, chat: { id: 1 } } });
-      runner.assert(sentMessage && sentMessage.includes('Prompt received'), 'Should echo prompt for /agent as admin');
-    });
-
-    await runner.test('/agent as non-admin returns admin error', async () => {
+    await runner.test('/agent as admin adds goal to notepad', async () => {
+        const CommandHandler = require('../../src/commands/command-handler');
+        let sentMessage = null;
+        let internalGoals = [];
+        const fakeClient = {
+          sendMessage: async (chatId, msg) => { sentMessage = msg; },
+          sendChatAction: async () => {}
+        };
+        const mockNotepadStore = {
+            load: async () => ({ goals: internalGoals }),
+            update: async (data) => { if (data.goals) internalGoals = data.goals; }
+        };
+        const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: '1.0.0' };
+        const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, mockNotepadStore);
+        await handler.handle({ message: { text: '/agent hello world', from: { id: 1, username: 'admin' }, chat: { id: 1 } } });
+        runner.assert(sentMessage && sentMessage.includes('Goal added'), 'Should confirm goal added');
+        runner.assert(internalGoals.includes('hello world'), 'Goal should be stored in notepad');
+      });    await runner.test('/agent as non-admin returns admin error', async () => {
       const CommandHandler = require('../../src/commands/command-handler');
       let sentMessage = null;
       const fakeClient = {
