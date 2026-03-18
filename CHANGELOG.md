@@ -4,6 +4,16 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.1] - 2026-03-18 - Patch
+
+### ✅ Chore - Version bump & docs
+- Bumped version to `1.10.1` in `package.json`.
+- Added release note and updated project docs (`PRD.md`, `progress.txt`).
+- Committed changes: `chore(release): bump version and update changelog`.
+
+---
+
+
 ## [1.10.0] - 2026-03-05 - History Command Feature
 
 ### ✅ Added - Conversation History

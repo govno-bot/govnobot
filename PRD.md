@@ -5,7 +5,21 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 
 > **⚠️ Important:** Always make edits to `PRD.md` as the *final step* in your workflow. Ensure all implementation and testing are complete before updating this document to reflect the final, verified state of the project.
 
-## Todo
+## Tasks
+ - [x] Implement "/jack [message]" command in govnobot node.js version. Use `sendMessageToJack.ps1` as a reference.  
+- [x] Continue R&D. Add at least 6 tasks to this list, the last one is a copy of the very this one 
+- [x] Research multi-language support and translation pipelines for bot responses.
+- [x] Explore plugin-based command discovery and hot-reload for rapid feature experimentation.
+- [x] Investigate memory and CPU profiling strategies for long-running agentic loops.
+ - [x] Evaluate alternative local/remote LLM providers (e.g., llama.cpp, local Ollama) and fallback strategies.
+- [x] Draft a security audit checklist for Telegram bot config, permissions, and secret management.
+- [x] Continue R&D. Add at least 6 tasks to this list, the last one is a copy of the very this one
+- [x] Add a model discovery endpoint and improve `/model list` output for local/remote models.
+- [x] Add metrics collection (latency/errors/cost) per LLM provider and dashboarding hooks.
+- [SKIP] Continue R&D. Add at least 6 tasks to this list, the last one is a copy of the very this one
+ - [x] update deployment checklist, fix/add deployment scripts if needed
+- [x] update version and changelog, commit changes
+### Previous Tasks
 - [x] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood." (Fixed missing initialization in entry point).
 - [x] **Advanced Agentic Loop:** Implement a continuous, self-prompting evaluation loop where the bot formulates its own goals, checks constraints, and queries the environment or users without explicit prompting.
 - [x] **Notepad & Todo-List Memory:** Give the bot a scratchpad / todo-list to persist its running thoughts, planned autonomous actions, and multi-step reasoning across polling/restart cycles.
@@ -37,6 +51,26 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 - [x] Implement Ollama Client (test/unit/ollama.test.js, src/ai/ollama.js)
 - [x] Implement OpenAI Client (test/unit/openai.test.js, src/ai/openai.js)
 - [x] Implement Fallback Chain (test/unit/fallback-chain.test.js, src/ai/fallback-chain.js)
+
+### LLM Provider Evaluation
+
+A concise evaluation of alternative local and remote LLM providers and recommended fallback strategies:
+
+- **llama.cpp (local, quantized models)**: Pros: runs offline, good privacy, low latency on CPU when models are quantized; cost-free once set up; wide community tooling. Cons: model sizes and quality vary; may require GPU for larger/faster models; setup and quantization tooling can be complex. Good fit for privacy-sensitive deployments and disconnected environments.
+
+- **Local Ollama (local HTTP API)**: Pros: simple local server with model management and HTTP API; supports multiple models and is easy to integrate (already implemented client exists). Cons: requires local resources and licensing considerations for some models; maintenance of the service process required. Good fit when a local, production-friendly HTTP interface is desired.
+
+- **Remote providers (OpenAI, hosted endpoints)**: Pros: highest-quality models, managed service, predictable API and SLAs. Cons: cost, latency, and privacy/trust concerns.
+
+- **Fallback & resilience strategies (recommended)**:
+    - Prefer local inference first (llama.cpp or local Ollama) when a model is available and healthy to reduce cost and latency.
+    - Fall back to a remote provider (OpenAI) when local is unavailable, timed out, or the requested model is not present.
+    - Keep a `FallbackChain` (already in codebase) with: provider health checks, timeouts, retry limits, and circuit-breaker behavior to avoid cascading failures.
+    - Implement model discovery & capability reporting (e.g., `listModels()`), so `/model` UI shows both local and remote options.
+    - Add metrics and telemetry (latency, errors, costs) per-provider to drive automated selection policies.
+    - Cache short-lived responses and use batching where appropriate to reduce rate usage and cost.
+
+These recommendations align with the existing `FallbackChain` implementation; next steps (if desired) are adding provider health probes, dynamic model scoring, and a preference policy favoring local models when latency/cost/quality thresholds are met.
 
 ### Commands & Finalization
 - [x] Implement Command Handler (test/unit/command-handler.test.js, src/commands/command-handler.js)
