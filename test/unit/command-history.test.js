@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const CommandHandler = require('../../src/commands/command-handler');
+const pkg = require('../../package.json');
+const version = pkg.version;
 const HistoryStore = require('../../src/storage/history-store');
 
 // Mock data directory for tests
@@ -33,7 +35,7 @@ module.exports.run = async function(runner) {
     const config = { 
       dataDir: TEST_DATA_DIR,
       ai: { availableModels: ['gpt'] },
-      version: '1.0.0'
+      version: version
     };
     
     // Pass logger mock
@@ -70,7 +72,7 @@ module.exports.run = async function(runner) {
     const config = { 
       dataDir: TEST_DATA_DIR,
       ai: { availableModels: ['gpt'] },
-      version: '1.0.0'
+      version: version
     };
     
     const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
@@ -105,7 +107,7 @@ module.exports.run = async function(runner) {
     const config = { 
       dataDir: TEST_DATA_DIR,
       ai: { availableModels: ['gpt'] },
-      version: '1.0.0'
+      version: version
     };
     
     const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
@@ -170,7 +172,7 @@ module.exports.run = async function(runner) {
     const config = { 
       dataDir: TEST_DATA_DIR,
       ai: { availableModels: ['gpt'] },
-      version: '1.0.0'
+      version: version
     };
     
     const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };

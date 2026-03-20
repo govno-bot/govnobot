@@ -1,5 +1,7 @@
 const assert = require('assert');
 const CommandHandler = require('../../src/commands/command-handler');
+const pkg = require('../../package.json');
+const version = pkg.version;
 
 module.exports.run = async function(runner) {
   // Mock dependencies
@@ -46,7 +48,7 @@ module.exports.run = async function(runner) {
     ai: {
       availableModels: ['gpt-4']
     },
-    version: '1.0.0'
+    version: version
   };
 
   // Helper to create handler with mocked exec
