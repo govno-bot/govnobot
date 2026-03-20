@@ -4,6 +4,15 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.3] - 2026-03-20 - Patch
+
+### ✅ Chore - Release
+- Bumped package version to `1.10.3`.
+- Ensure `Config` reads `package.json` for runtime version and tests reference the package version dynamically.
+- Small fixes and test updates related to persona escaping and reminder locking.
+
+---
+
 ## [1.10.1] - 2026-03-18 - Patch
 
 ### ✅ Chore - Version bump & docs
