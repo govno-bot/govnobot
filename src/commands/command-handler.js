@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { chunk } = require('../utils/chunker');
 const { handleError } = require('../utils/error-handler');
 const SettingsStore = require('../storage/settings-store');
@@ -17,7 +18,7 @@ const logsCommand = require('./admin/command-logs');
  */
 
 class CommandHandler {
-  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore, notepadStore) {
+  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore, notepadStore, options = {}) {
     this.client = client;
     this.config = config;
     this.logger = logger;
@@ -31,11 +32,173 @@ class CommandHandler {
     // Map of commands to handler functions
     this.publicCommands = new Map();
     this.adminCommands = new Map();
+    // Plugin support (dynamic command discovery + hot reload)
+    this.pluginDir = options.pluginDir || path.join(__dirname, '..', 'plugins');
+    this.plugins = new Map(); // pluginPath -> { commands: { public:Set, admin:Set }, module }
+    this._pluginWatchTimers = new Map();
+    this.watchPlugins = options.watchPlugins !== false;
     
     // For testing: allow exec to be mocked
     this.exec = require('child_process').exec;
     
     this.registerDefaultCommands();
+    // Load plugins and optionally watch for changes
+    this.loadPlugins();
+    if (this.watchPlugins) {
+      this.watchPluginDirectory();
+    }
+  }
+  
+  /**
+   * Load all plugins from the plugins directory.
+   */
+  loadPlugins() {
+    try {
+      if (!fs.existsSync(this.pluginDir)) {
+        fs.mkdirSync(this.pluginDir, { recursive: true });
+      }
+
+      const files = fs.readdirSync(this.pluginDir);
+      files.forEach((file) => {
+        if (!file.endsWith('.js')) return;
+        const pluginPath = path.join(this.pluginDir, file);
+        this.loadPlugin(pluginPath);
+      });
+    } catch (err) {
+      this.logger?.error('Failed to load plugins', err);
+    }
+  }
+
+  /**
+   * Watch the plugins directory for changes and reload plugins automatically.
+   */
+  watchPluginDirectory() {
+    try {
+      const watcher = fs.watch(this.pluginDir, (eventType, filename) => {
+        if (!filename || !filename.endsWith('.js')) return;
+        const pluginPath = path.join(this.pluginDir, filename);
+
+        // Debounce rapid successive events
+        if (this._pluginWatchTimers.has(pluginPath)) {
+          clearTimeout(this._pluginWatchTimers.get(pluginPath));
+        }
+
+        const timer = setTimeout(() => {
+          this._pluginWatchTimers.delete(pluginPath);
+
+          // If file was removed, unload plugin
+          if (!fs.existsSync(pluginPath)) {
+            this.unloadPlugin(pluginPath);
+            return;
+          }
+          // Otherwise reload on change
+          this.reloadPlugin(pluginPath);
+        }, 100);
+
+        this._pluginWatchTimers.set(pluginPath, timer);
+      });
+      watcher.on('error', (err) => {
+        this.logger?.warn('Plugin directory watcher error', err);
+      });
+    } catch (err) {
+      this.logger?.warn('Failed to watch plugin directory', err);
+    }
+  }
+
+  /**
+   * Unload a plugin and remove its registered commands.
+   */
+  unloadPlugin(pluginPath) {
+    const record = this.plugins.get(pluginPath);
+    if (!record) return;
+
+    // Remove registered commands
+    record.commands.public.forEach((cmd) => {
+      this.publicCommands.delete(cmd);
+    });
+    record.commands.admin.forEach((cmd) => {
+      this.adminCommands.delete(cmd);
+    });
+
+    // Clear require cache
+    try {
+      const resolved = require.resolve(pluginPath);
+      delete require.cache[resolved];
+      this.logger?.info(`Unloaded plugin: ${path.basename(pluginPath)}`);
+    } catch (err) {
+      // ignore
+    }
+
+    this.plugins.delete(pluginPath);
+  }
+
+  /**
+   * Reload a plugin file on disk.
+   */
+  reloadPlugin(pluginPath) {
+    this.unloadPlugin(pluginPath);
+    this.loadPlugin(pluginPath);
+  }
+
+  /**
+   * Load a single plugin file.
+   */
+  loadPlugin(pluginPath) {
+    try {
+      const pluginName = path.basename(pluginPath);
+
+      // Clear require cache before loading
+      try {
+        const resolved = require.resolve(pluginPath);
+        delete require.cache[resolved];
+      } catch (err) {
+        // ignore missing cache
+      }
+
+      const pluginModule = require(pluginPath);
+      if (!pluginModule || typeof pluginModule.init !== 'function') {
+        this.logger?.warn(`Plugin ${pluginName} does not export an init(bot) function`);
+        return;
+      }
+
+      const record = {
+        module: pluginModule,
+        commands: {
+          public: new Set(),
+          admin: new Set()
+        }
+      };
+
+      // Create plugin-scoped registration helpers
+      const pluginApi = {
+        registerPublicCommand: (name, handler) => {
+          this.registerPublicCommandForPlugin(name, handler, pluginPath);
+          record.commands.public.add(name.toLowerCase());
+        },
+        registerAdminCommand: (name, handler) => {
+          this.registerAdminCommandForPlugin(name, handler, pluginPath);
+          record.commands.admin.add(name.toLowerCase());
+        },
+        config: this.config,
+        logger: this.logger,
+        client: this.client,
+        fallbackChain: this.fallbackChain
+      };
+
+      this.plugins.set(pluginPath, record);
+      pluginModule.init(pluginApi);
+      this.logger?.info(`Loaded plugin: ${pluginName}`);
+    } catch (err) {
+      this.logger?.error(`Error loading plugin ${pluginPath}`, err);
+    }
+  }
+
+  registerPublicCommandForPlugin(name, handler, pluginPath) {
+    this.registerPublicCommand(name, handler);
+  }
+
+  registerAdminCommandForPlugin(name, handler, pluginPath) {
+    this.registerAdminCommand(name, handler);
   }
 
   /**
@@ -53,6 +216,9 @@ class CommandHandler {
     this.registerPublicCommand('stats', this.handleStats.bind(this));
     this.registerPublicCommand('status', this.handleStatus.bind(this));
     this.registerPublicCommand('version', this.handleVersion.bind(this));
+
+    // Admin helper command: send message to Jack via local automation script
+    this.registerAdminCommand('jack', this.handleJackCommand.bind(this));
 
     this.registerPublicCommand(remindCommand.name, remindCommand.handler);
     this.registerPublicCommand(personaCommand.name, personaCommand.handler);
@@ -363,30 +529,28 @@ Use /help for more information.
   async handleHelp(context) {
     const { chatId, isAdmin } = context;
     const availableModels = await this.getAvailableModels();
-    
+    const publicCommands = Array.from(this.publicCommands.keys()).sort();
+    const adminCommands = Array.from(this.adminCommands.keys()).sort();
+
     let message = `
 <b>GovnoBot Commands</b>
 
 <b>Public Commands:</b>
-/ask &lt;query&gt; - Ask a question
-/fix &lt;query&gt; - Fix a problem
-/model - Change AI model
-/settings - View/change settings
-/history - View conversation history
-/status - Show bot status
-/help - Show this message
+${publicCommands.map(cmd => `/${cmd}`).join('\n')}
 
 <b>Available Models:</b>
-${availableModels.join(', ')}
+${availableModels.map(m => `${m.id} (${m.provider} - ${m.source})`).join(', ')}
     `.trim();
     
     if (isAdmin) {
       message += `
 
 <b>Admin Commands:</b>
-/sh &lt;command&gt; - Execute shell command
-/audit - View audit log
       `;
+    }
+    
+    if (isAdmin && adminCommands.length > 0) {
+      message += `${adminCommands.map(cmd => `/${cmd}`).join('\n')}`;
     }
     
     await this.client.sendMessage(chatId, message, { parse_mode: 'HTML' });
@@ -410,6 +574,16 @@ ${availableModels.join(', ')}
     const question = args.join(' ');    // Show typing indicator
     await this.client.sendChatAction(chatId, 'typing');
     
+    // Load user settings (for model, system prompt, and language)
+    const settingsDir = path.join(this.config.dataDir, 'settings');
+    let settings = { model: this.config.ai.defaultModel, systemPrompt: 'You are a helpful assistant.', language: 'en' };
+    try {
+      const store = new SettingsStore(chatId, settingsDir);
+      settings = await store.load();
+    } catch (err) {
+      this.logger.error(`Error loading settings for user ${chatId} during /ask`, err);
+    }
+    
     // Save user message to history
     const historyDir = path.join(this.config.dataDir, 'history');
     const historyStore = new HistoryStore(historyDir);
@@ -425,8 +599,20 @@ ${availableModels.join(', ')}
         throw new Error('AI service not configured');
       }
 
-      // Call AI service
-      const answer = await this.fallbackChain.call(question);
+      // Build prompt with optional system prompt and language preference
+      const language = (settings.language || 'en').toLowerCase();
+      const messages = [];
+      if (settings.systemPrompt) {
+        messages.push({ role: 'system', content: settings.systemPrompt });
+      }
+      let userPrompt = question;
+      if (language && language !== 'en') {
+        userPrompt = `Please answer the following question in ${language}:\n\n${question}`;
+      }
+      messages.push({ role: 'user', content: userPrompt });
+
+      // Call AI service using the user's preferred model
+      const answer = await this.fallbackChain.call(messages, { model: settings.model });
       
       // Save assistant message to history
       try {
@@ -466,11 +652,11 @@ ${availableModels.join(', ')}
       settings = { model: this.config.ai.defaultModel };
     }
     
-    // Fetch available models dynamically
+    // Fetch available models dynamically (array of objects)
     const availableModels = await this.getAvailableModels();
     
     if (args.length === 0) {
-      const models = availableModels.join('\n');
+      const models = availableModels.map(m => `${m.id} — ${m.provider} (${m.source})`).join('\n');
       const message = `
 <b>Available AI Models:</b>
 ${models}
@@ -488,10 +674,12 @@ Use: /model &lt;model_name&gt;
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
     
-    if (!availableModels.includes(selectedModel)) {
+    // Normalize available model ids for matching
+    const normalizedIds = availableModels.map(m => String(m.id).toLowerCase());
+    if (!normalizedIds.includes(selectedModel)) {
       await this.client.sendMessage(
         chatId,
-        `❌ Invalid model: ${selectedModel}\n\nAvailable models: ${availableModels.join(', ')}`
+        `❌ Invalid model: ${selectedModel}\n\nAvailable models: ${availableModels.map(m => m.id).join(', ')}`
       );
       return;
     }
@@ -522,7 +710,8 @@ Use: /model &lt;model_name&gt;
       this.logger.error(`Error loading settings for user ${chatId}`, err);
       settings = { 
         model: this.config.ai.defaultModel,
-        systemPrompt: 'You are a helpful assistant.'
+        systemPrompt: 'You are a helpful assistant.',
+        language: 'en'
       };
     }
     
@@ -533,6 +722,7 @@ Use: /model &lt;model_name&gt;
 
 Model: ${settings.model || this.config.ai.defaultModel}
 System Prompt: ${settings.systemPrompt || 'You are a helpful assistant.'}
+Language: ${settings.language || 'en'}
 
 To change a setting, use:
 /settings &lt;key&gt; &lt;value&gt;
@@ -565,21 +755,28 @@ Examples:
     if (rawKey === 'model') {
       value = value.toLowerCase();
       const availableModels = await this.getAvailableModels();
-      
-      if (!availableModels.includes(value)) {
+      const ids = availableModels.map(m => String(m.id).toLowerCase());
+      if (!ids.includes(value)) {
         await this.client.sendMessage(
           chatId,
-          `❌ Invalid model: ${value}\n\nAvailable models: ${availableModels.join(', ')}`
+          `❌ Invalid model: ${value}\n\nAvailable models: ${availableModels.map(m => m.id).join(', ')}`
         );
         return;
       }
     } else if (rawKey === 'systemPrompt') {
       // Any string is valid for systemPrompt, trim it
       value = value.trim();
+    } else if (rawKey === 'language') {
+      value = value.toLowerCase().trim();
+      // Basic ISO language tag validation (e.g., en, es, pt-BR)
+      if (!/^[a-z]{2,8}(?:-[a-z]{2,8})?$/.test(value)) {
+        await this.client.sendMessage(chatId, `❌ Invalid language code: ${value}\n\nUse ISO-language tags like 'en', 'es', 'fr', 'pt-BR'.`);
+        return;
+      }
     } else {
       await this.client.sendMessage(
         chatId,
-        `❌ Invalid setting key: ${key}\n\nValid keys: model, systemPrompt`
+        `❌ Invalid setting key: ${key}\n\nValid keys: model, systemPrompt, language`
       );
       return;
     }
@@ -676,7 +873,7 @@ Examples:
 <b>Bot Status</b>
 
 Version: ${this.config.version}
-Status: 🟢 Online
+Status: 🕺Online
 Uptime: ${hours}h ${minutes}m
 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
 Default Model: ${this.config.ai.defaultModel}
@@ -723,6 +920,66 @@ Default Model: ${this.config.ai.defaultModel}
         }
         await this.client.sendMessage(chatId, '```\n' + output + '\n```', { parse_mode: 'Markdown' });
         this.logAuditAction(chatId, username, '/sh', command, 'EXECUTED', error ? error.message : null);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Handle /jack command (admin only)
+   * Uses local sendMessageToJack.ps1 script to automate sending a message to Jack via Facebook Messenger.
+   */
+  async handleJackCommand(context) {
+    const { chatId, username, args } = context;
+
+    if (process.platform !== 'win32') {
+      await this.client.sendMessage(chatId, '⚠️ /jack is only supported on Windows environments.');
+      return;
+    }
+
+    if (args.length === 0) {
+      await this.client.sendMessage(chatId, '❌ Usage: /jack <message>');
+      return;
+    }
+
+    const message = args.join(' ');
+    const projectRoot = this.config.projectRoot || process.cwd();
+    const scriptPath = path.join(projectRoot, 'sendMessageToJack.ps1');
+
+    if (!fs.existsSync(scriptPath)) {
+      await this.client.sendMessage(chatId, '❌ sendMessageToJack.ps1 script not found.');
+      return;
+    }
+
+    await this.client.sendChatAction(chatId, 'typing');
+
+    // Use PowerShell to invoke the script (Windows only).
+    const powershell = 'powershell.exe';
+    const argsForExec = [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      scriptPath,
+      '-Message',
+      message
+    ];
+
+    await new Promise((resolve) => {
+      // Use execFile to avoid shell quoting issues
+      const execFn = this.execFile || require('child_process').execFile;
+      execFn(powershell, argsForExec, { timeout: 20000, maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+        let response;
+        if (error) {
+          response = `❌ Failed to send message to Jack: ${error.message}`;
+        } else if (stderr) {
+          response = `⚠️ Jack script output (stderr): ${stderr.trim()}`;
+        } else {
+          response = '✅ Message sent to Jack.';
+        }
+        await this.client.sendMessage(chatId, response);
+        this.logAuditAction(chatId, username, '/jack', message, error ? 'FAILED' : 'EXECUTED', error ? error.message : null);
         resolve();
       });
     });
@@ -791,22 +1048,33 @@ Default Model: ${this.config.ai.defaultModel}
    * Get all available models (configured + dynamic)
    */
   async getAvailableModels() {
-    let dynamicModels = [];
-    if (this.fallbackChain && typeof this.fallbackChain.listModels === 'function') {
-      try {
-        dynamicModels = await this.fallbackChain.listModels();
-      } catch (err) {
-        this.logger.warn('Failed to fetch dynamic models', err);
+    // Prefer detailed discovery when available
+    if (this.fallbackChain) {
+      if (typeof this.fallbackChain.listModelsDetailed === 'function') {
+        try {
+          const detailed = await this.fallbackChain.listModelsDetailed();
+          if (detailed && detailed.length > 0) return detailed;
+        } catch (err) {
+          this.logger.warn('Failed to fetch detailed dynamic models', err);
+        }
       }
-    }
-    
-    // If we have dynamic models (from Ollama/OpenAI), use them as the source of truth
-    if (dynamicModels.length > 0) {
-      return Array.from(new Set(dynamicModels));
+
+      if (typeof this.fallbackChain.listModels === 'function') {
+        try {
+          const simple = await this.fallbackChain.listModels();
+          if (simple && simple.length > 0) {
+            // Normalize to objects
+            return simple.map(m => ({ id: m, provider: 'unknown', source: 'remote' }));
+          }
+        } catch (err) {
+          this.logger.warn('Failed to fetch dynamic models', err);
+        }
+      }
     }
 
     // Fallback to config if discovery failed completely
-    return Array.from(new Set(this.config.ai.availableModels));
+    const cfg = Array.isArray(this.config.ai.availableModels) ? this.config.ai.availableModels : [];
+    return cfg.map(m => ({ id: m, provider: 'config', source: 'config' }));
   }
 }
 

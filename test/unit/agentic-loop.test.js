@@ -6,8 +6,9 @@ async function run(runner) {
     const tempNotepadFile = path.join(__dirname, 'temp_notepad.json');
 
     // Mocks
+    const debugMessages = [];
     const mockLogger = {
-        info: () => {}, warn: () => {}, error: () => {}, debug: () => {}
+        info: () => {}, warn: () => {}, error: () => {}, debug: (msg) => { debugMessages.push(msg); }
     };
 
     const mockTelegramApiClient = {
@@ -41,7 +42,11 @@ async function run(runner) {
         loop.stop();
         runner.assert(loop.isRunning === false, 'sets isRunning to false when stop() called');
 
+        // Enable profiling and verify it logs memory/cpu stats.
+        loop.enableProfiling();
+
         await loop.executeIteration();
+        runner.assert(debugMessages.some(m => m.includes('AgenticLoop profiling')), 'profiling logs memory/cpu stats');
         const notepad = await mockNotepadStore.load();
         runner.assert(notepad.thoughts === 'test thoughts', 'executeIteration parses thoughts correctly');
         runner.assert(notepad.goals && notepad.goals[0] === 'goal 1', 'executeIteration parses goals correctly');

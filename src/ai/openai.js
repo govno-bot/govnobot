@@ -4,6 +4,7 @@
 
 const https = require('https');
 const { URL } = require('url');
+const metrics = require('./metrics');
 
 class OpenAIClient {
   /**
@@ -26,6 +27,7 @@ class OpenAIClient {
    * @returns {Promise<string>} response
    */
   async chat(messages, options = {}) {
+    const startTs = Date.now();
     const url = new URL('/v1/chat/completions', this.baseUrl);
     const body = JSON.stringify({
       model: options.model || this.model,
@@ -51,16 +53,32 @@ class OpenAIClient {
         res.on('end', () => {
           try {
             const json = JSON.parse(data);
+            const latencyMs = Date.now() - startTs;
+            const usage = json.usage || {};
+            const totalTokens = Number(usage.total_tokens || 0);
+            const estimatedCost = 0; // keep 0 by default; real cost calc requires pricing table
+
             if (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) {
+              // Record metrics (successful call)
+              try { metrics.record(this.name, { latencyMs, error: false, cost: estimatedCost, model: options.model || this.model }); } catch (e) {}
               return resolve(json.choices[0].message.content);
             }
+
+            // Record error metric
+            try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (e) {}
             reject(new Error(json.error?.message || 'No response from OpenAI'));
           } catch (e) {
+            const latencyMs = Date.now() - startTs;
+            try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (er) {}
             reject(new Error('Invalid JSON from OpenAI: ' + e.message));
           }
         });
       });
-      req.on('error', reject);
+      req.on('error', err => {
+        const latencyMs = Date.now() - startTs;
+        try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (e) {}
+        reject(err);
+      });
       req.write(body);
       req.end();
     });
@@ -82,7 +100,9 @@ class OpenAIClient {
    * @returns {Promise<string[]>}
    */
   async listModels() {
-    return [{ id: this.model, provider: this.name }];
+    // Return a simple array of model ids (strings). Higher-level code will
+    // normalize provider/source metadata.
+    return [this.model];
   }
 
   /**
@@ -204,15 +224,7 @@ class OpenAIClient {
     });
   }
 
-  /**
-   * List available models
-   * Since OpenAI API doesn't list all models in use easily,
-   * we return the configured model if API key is present.
-   * @returns {Promise<string[]>}
-   */
-  async listAvailableModels() {
-    return [{ id: this.model, provider: this.name }];
-  }
+  // Note: no additional listAvailableModels helper - use listModels()
 }
 
 module.exports = OpenAIClient;

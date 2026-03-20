@@ -1,23 +1,73 @@
 // FallbackChain: tries a list of providers in order, falling back on error
 // Zero dependencies, Node.js only
+const metrics = require('./metrics');
+
 class FallbackChain {
-  constructor(providers) {
+  /**
+   * @param {Array} providers - Ordered list of provider objects
+   * @param {Object} [options]
+   * @param {number} [options.healthTTL] - ms to keep a provider marked unhealthy before retrying
+   * @param {number} [options.probeTimeout] - ms timeout for health probes
+   */
+  constructor(providers, options = {}) {
     if (!Array.isArray(providers) || providers.length === 0) {
       throw new Error('FallbackChain requires a non-empty array of providers');
     }
     this.providers = providers;
     this.providerNames = providers.map(p => p.name || 'unnamed');
+    this.healthTTL = typeof options.healthTTL === 'number' ? options.healthTTL : 60 * 1000; // 60s
+    this.probeTimeout = typeof options.probeTimeout === 'number' ? options.probeTimeout : 2000; // 2s
+    // health map: providerName -> { healthy: boolean, ts: number }
+    this._health = new Map();
   }
 
   async call(input, opts) {
     const errors = [];
+    const now = Date.now();
+
+    // Try providers in order, skipping those that are recently marked unhealthy
     for (const provider of this.providers) {
+      const pname = provider.name || 'unnamed';
+      const health = this._health.get(pname);
+      if (health && health.healthy === false && (now - health.ts) < this.healthTTL) {
+        // Skip recently-unhealthy provider
+        continue;
+      }
+
       try {
-        return await provider.call(input, opts);
+        const res = await provider.call(input, opts);
+        try {
+          metrics.emit('provider_selected', { provider: pname, ts: Date.now(), model: (opts && opts.model) || provider.model || null });
+        } catch (e) {}
+        // mark healthy
+        this._health.set(pname, { healthy: true, ts: Date.now() });
+        return res;
       } catch (err) {
-        errors.push(`${provider.name || 'unnamed'}: ${err.message}`);
+        // mark unhealthy
+        this._health.set(pname, { healthy: false, ts: Date.now() });
+        errors.push(`${pname}: ${err.message}`);
       }
     }
+
+    // If everything was skipped (all marked unhealthy), probe all providers once and retry
+    const anyHealthy = await this._probeAllOnce();
+    if (anyHealthy) {
+      // Retry once using refreshed health info
+      for (const provider of this.providers) {
+        const pname = provider.name || 'unnamed';
+        const health = this._health.get(pname);
+        if (health && health.healthy === false && (Date.now() - health.ts) < this.healthTTL) continue;
+        try {
+          const res = await provider.call(input, opts);
+          this._health.set(pname, { healthy: true, ts: Date.now() });
+          return res;
+        } catch (err) {
+          this._health.set(pname, { healthy: false, ts: Date.now() });
+          errors.push(`${pname}: ${err.message}`);
+        }
+      }
+    }
+
     throw new Error('All providers failed: ' + errors.join(' | '));
   }
 
@@ -40,6 +90,49 @@ class FallbackChain {
       }
     }
     return Array.from(models);
+  }
+
+  /**
+   * Get available models from all providers with metadata
+   * @returns {Promise<Array<{id: string, provider: string, source: string}>>}
+   */
+  async listModelsDetailed() {
+    const result = [];
+    for (const provider of this.providers) {
+      const pname = provider.name || 'unnamed';
+      const source = pname === 'ollama' ? 'local' : 'remote';
+
+      if (typeof provider.listModels === 'function') {
+        try {
+          const providerModels = await provider.listModels();
+          // Normalize entries: strings -> { id }
+          for (const m of providerModels) {
+            if (!m) continue;
+            if (typeof m === 'string') {
+              result.push({ id: m, provider: pname, source });
+            } else if (typeof m === 'object' && (m.id || m.name)) {
+              result.push({ id: m.id || m.name, provider: m.provider || pname, source: m.source || source });
+            }
+          }
+        } catch (err) {
+          // Ignore failing provider
+        }
+      } else if (provider.model) {
+        result.push({ id: provider.model, provider: pname, source });
+      }
+    }
+
+    // Deduplicate by id keeping first seen
+    const seen = new Set();
+    const deduped = [];
+    for (const item of result) {
+      const key = String(item.id).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(item);
+    }
+
+    return deduped;
   }
 
   /**

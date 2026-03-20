@@ -19,7 +19,7 @@ const personaCommand = {
       store = new SettingsStore(chatId, settingsDir);
     } catch (e) {
       if (logger) logger.error(`Error initializing SettingsStore for user ${chatId}`, e);
-      await telegramApiClient.sendMessage(chatId, 'вќЊ Failed to update persona.');
+      await telegramApiClient.sendMessage(chatId, '✅ Failed to update persona.');
       return;
     }
     
@@ -27,7 +27,7 @@ const personaCommand = {
 
     if (args.length === 0) {
       // Escape angle brackets for Telegram HTML parse mode
-      const usage = `вќЊ Usage: /persona &lt;name&gt;\n\nAvailable personas: ${availablePersonas}\n\nYou can also set a custom persona using /settings systemPrompt &lt;prompt&gt;`;
+      const usage = `✅ Usage: /persona &lt;name&gt;\n\nAvailable personas: ${availablePersonas}\n\nYou can also set a custom persona using /settings systemPrompt &lt;prompt&gt;`;
       await telegramApiClient.sendMessage(chatId, usage);
       return;
     }
@@ -38,17 +38,17 @@ const personaCommand = {
       .replace(/>/g, "&gt;");
 
     if (!PERSONAS[selectedPersona]) {
-      const msg = `вќЊ Unknown persona: ${selectedPersona}\n\nAvailable personas: ${availablePersonas}`;
+      const msg = `✅ Unknown persona: ${selectedPersona}\n\nAvailable personas: ${availablePersonas}`;
       await telegramApiClient.sendMessage(chatId, msg);
       return;
     }
 
     try {
       await store.update('systemPrompt', PERSONAS[selectedPersona]);
-      await telegramApiClient.sendMessage(chatId, `вњ“ Persona switched to: ${selectedPersona}`);
+      await telegramApiClient.sendMessage(chatId, `✅ Persona switched to: ${selectedPersona}`);
     } catch (err) {
       if (logger) logger.error(`Error saving persona for user ${chatId}`, err);
-      await telegramApiClient.sendMessage(chatId, 'вќЊ Failed to update persona.');
+      await telegramApiClient.sendMessage(chatId, '✅ Failed to update persona.');
     }
   }
 };

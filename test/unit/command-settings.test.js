@@ -64,6 +64,7 @@ module.exports.run = async function(runner) {
     assert.ok(msg.includes('Current Settings'), 'Should show title');
     assert.ok(msg.includes('Model: deepseek-r1:8b'), 'Should show default model');
     assert.ok(msg.includes('System Prompt: You are a helpful assistant.'), 'Should show default prompt');
+    assert.ok(msg.includes('Language: en'), 'Should show default language');
   }
 
   // Test 2: /settings model <invalid>
@@ -104,6 +105,18 @@ module.exports.run = async function(runner) {
     assert.strictEqual(settings.systemPrompt, prompt, 'Should persist new prompt');
   }
 
+  // Test 5: /settings language <value>
+  {
+    mockClient.reset();
+    await handler.handleSettings({ chatId, args: ['language', 'es'] });
+    assert.strictEqual(mockClient.messages.length, 1);
+    const msg = mockClient.messages[0].text;
+    assert.ok(msg.includes('Settings updated'), 'Should confirm update');
+
+    const settings = await store.load();
+    assert.strictEqual(settings.language, 'es', 'Should persist language setting');
+  }
+
   // Test 5: /settings <invalid_key>
   {
     mockClient.reset();
@@ -114,6 +127,7 @@ module.exports.run = async function(runner) {
     assert.ok(msg.includes('Invalid setting'), 'Should warn about invalid key');
     assert.ok(msg.includes('model'), 'Should list valid keys');
     assert.ok(msg.includes('systemPrompt'), 'Should list valid keys');
+    assert.ok(msg.includes('language'), 'Should list valid keys');
   }
   
   // Check persisted state (re-verify)

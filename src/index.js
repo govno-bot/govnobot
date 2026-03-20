@@ -167,6 +167,9 @@ async function initialize() {
       reminderStore,
       historyStore: undefined
     });
+    if (config.profiling?.agenticLoopEnabled) {
+      agenticLoop.enableProfiling();
+    }
     agenticLoop.start();
     logger.info('✓ Advanced Agentic Loop started');
 

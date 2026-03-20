@@ -7,66 +7,72 @@ const mockLogger = {
     error: sinon.spy(),
 };
 
-describe('Command: /remind', () => {
-    let reminderStore;
-    let telegramApiClient;
-    let message;
+module.exports.run = async function(runner) {
+    await runner.test('should show usage if args are insufficient', async () => {
+        const reminderStore = { add: sinon.stub().resolves() };
+        const telegramApiClient = { sendMessage: sinon.stub().resolves() };
+        const message = { chat: { id: 123 } };
 
-    beforeEach(() => {
-        reminderStore = {
-            add: sinon.stub().resolves(),
-        };
-        telegramApiClient = {
-            sendMessage: sinon.stub().resolves(),
-        };
-        message = {
-            chat: { id: 123 },
-        };
-        mockLogger.info.resetHistory();
-        mockLogger.error.resetHistory();
+        await handleRemind({ chatId: message.chat.id, args: [], telegramApiClient });
+        runner.assert(
+            telegramApiClient.sendMessage.calledWith(123, 'Usage: /remind <time> <message>\nExample: /remind 10m Check on the cat'),
+            'Should send usage message when no args provided'
+        );
     });
 
-    afterEach(() => {
-        sinon.restore();
+    await runner.test('should reject invalid time format', async () => {
+        const reminderStore = { add: sinon.stub().resolves() };
+        const telegramApiClient = { sendMessage: sinon.stub().resolves() };
+        const message = { chat: { id: 123 } };
+
+        await handleRemind({ chatId: message.chat.id, args: ['10x', 'test'], telegramApiClient });
+        runner.assert(
+            telegramApiClient.sendMessage.calledWith(123, 'Invalid time format. Use s, m, h, d (e.g., 30s, 10m, 2h, 1d).'),
+            'Should reject invalid time formats'
+        );
     });
 
-    it('should show usage if args are insufficient', async () => {
-        await handleRemind(message, [], { telegramApiClient });
-        assert(telegramApiClient.sendMessage.calledWith(123, 'Usage: /remind <time> <message>\nExample: /remind 10m Check on the cat'));
-    });
-
-    it('should reject invalid time format', async () => {
-        await handleRemind(message, ['10x', 'test'], { telegramApiClient });
-        assert(telegramApiClient.sendMessage.calledWith(123, 'Invalid time format. Use s, m, h, d (e.g., 30s, 10m, 2h, 1d).'));
-    });
-
-    it('should set a reminder successfully', async () => {
+    await runner.test('should set a reminder successfully', async () => {
         const clock = sinon.useFakeTimers();
         const now = Date.now();
-        
-        await handleRemind(message, ['10m', 'Check the oven'], { reminderStore, telegramApiClient, logger: mockLogger });
+        const reminderStore = { add: sinon.stub().resolves() };
+        const telegramApiClient = { sendMessage: sinon.stub().resolves() };
+        const message = { chat: { id: 123 } };
 
-        assert(reminderStore.add.calledOnce);
+        mockLogger.info.resetHistory();
+        mockLogger.error.resetHistory();
+
+        await handleRemind({ chatId: message.chat.id, args: ['10m', 'Check the oven'], reminderStore, telegramApiClient, logger: mockLogger });
+
+        runner.assert(reminderStore.add.calledOnce, 'Should add reminder to store');
         const reminder = reminderStore.add.getCall(0).args[0];
-        assert.strictEqual(reminder.chatId, 123);
-        assert.strictEqual(reminder.message, 'Check the oven');
-        assert.ok(reminder.remindAt > now + 9 * 60 * 1000);
+        runner.assertEqual(reminder.chatId, 123, 'Reminder chatId should match');
+        runner.assertEqual(reminder.message, 'Check the oven', 'Reminder message should match');
+        runner.assert(reminder.remindAt > now + 9 * 60 * 1000, 'Reminder time should be in the future');
 
-        assert(telegramApiClient.sendMessage.calledOnce);
+        runner.assert(telegramApiClient.sendMessage.calledOnce, 'Should send confirmation message');
         const sentMessage = telegramApiClient.sendMessage.getCall(0).args[1];
-        assert.ok(sentMessage.startsWith('✅ Reminder set for'));
+        runner.assert(sentMessage.startsWith('✅ Reminder set for'), 'Should confirm reminder scheduled');
 
-        assert(mockLogger.info.calledOnce);
-
+        runner.assert(mockLogger.info.calledOnce, 'Logger should be called');
         clock.restore();
     });
 
-    it('should handle errors when setting a reminder', async () => {
-        reminderStore.add.rejects(new Error('Store failed'));
-        await handleRemind(message, ['5s', 'a quick one'], { reminderStore, telegramApiClient, logger: mockLogger });
+    await runner.test('should handle errors when setting a reminder', async () => {
+        const reminderStore = { add: sinon.stub().rejects(new Error('Store failed')) };
+        const telegramApiClient = { sendMessage: sinon.stub().resolves() };
+        const message = { chat: { id: 123 } };
 
-        assert(reminderStore.add.calledOnce);
-        assert(telegramApiClient.sendMessage.calledWith(123, '❌ Could not set reminder. Please try again later.'));
-        assert(mockLogger.error.calledOnce);
+        mockLogger.info.resetHistory();
+        mockLogger.error.resetHistory();
+
+        await handleRemind({ chatId: message.chat.id, args: ['5s', 'a quick one'], reminderStore, telegramApiClient, logger: mockLogger });
+
+        runner.assert(reminderStore.add.calledOnce, 'Should attempt to add reminder');
+        runner.assert(
+            telegramApiClient.sendMessage.calledWith(123, '❌ Could not set reminder. Please try again later.'),
+            'Should notify user about the failure'
+        );
+        runner.assert(mockLogger.error.calledOnce, 'Logger should record error');
     });
-});
+};

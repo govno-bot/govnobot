@@ -25,10 +25,13 @@ module.exports.run = async function(runner) {
       sendChatAction: async () => {} 
     };
     
-    // Mock FallbackChain
+    // Mock FallbackChain: accept the messages array and return answer when user content matches
     const fakeChain = {
-      call: async (input) => { 
-        if (input === 'What is life?') return '42';
+      call: async (input) => {
+        if (Array.isArray(input)) {
+          const user = input.find(m => m.role === 'user');
+          if (user && user.content === 'What is life?') return '42';
+        }
         return 'Unknown';
       }
     };

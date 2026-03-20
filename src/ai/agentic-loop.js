@@ -13,8 +13,30 @@ class AgenticLoop {
         this.notepadStore = notepadStore;
         this.reminderStore = reminderStore;
 
+        // Optional profiling settings
+        // When enabled, AgenticLoop logs periodic memory/cpu usage for long-running runs.
+        this.profilingEnabled = false;
+        this.lastCpuUsage = process.cpuUsage();
+
         this.timer = null;
         this.isRunning = false;
+    }
+
+    enableProfiling() {
+        this.profilingEnabled = true;
+        this.lastCpuUsage = process.cpuUsage();
+    }
+
+    captureProfilingStats() {
+        const memoryUsage = process.memoryUsage();
+        const cpuUsageDelta = process.cpuUsage(this.lastCpuUsage);
+        this.lastCpuUsage = process.cpuUsage();
+
+        return {
+            timestamp: new Date().toISOString(),
+            memoryUsage,
+            cpuUsageDelta
+        };
     }
 
     start() {
@@ -24,6 +46,9 @@ class AgenticLoop {
         }
         this.isRunning = true;
         if (this.logger) this.logger.info('AgenticLoop started.');
+        if (this.profilingEnabled && this.logger) {
+            this.logger.info('AgenticLoop profiling enabled. Memory/CPU stats will be logged each iteration.');
+        }
         this.scheduleNextIteration(10000); // 10 seconds for the first run
     }
 
@@ -65,6 +90,11 @@ class AgenticLoop {
 
     async executeIteration() {
         if (this.logger) this.logger.info('AgenticLoop: Executing evaluation iteration.');
+
+        if (this.profilingEnabled && this.logger) {
+            const stats = this.captureProfilingStats();
+            this.logger.debug(`AgenticLoop profiling: rss=${Math.round(stats.memoryUsage.rss / 1024 / 1024)}MB heapUsed=${Math.round(stats.memoryUsage.heapUsed / 1024 / 1024)}MB cpuUser=${Math.round(stats.cpuUsageDelta.user / 1000)}ms cpuSystem=${Math.round(stats.cpuUsageDelta.system / 1000)}ms`);
+        }
         
         let notepad = { goals: [], thoughts: "", planned_actions: [] };
         if (this.notepadStore) {

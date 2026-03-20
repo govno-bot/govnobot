@@ -9,8 +9,23 @@ const path = require('path');
 
 class Config {
   constructor() {
-    this.version = '1.10.0';
     this.projectRoot = path.dirname(__dirname); // Correctly sets project root from src/
+
+    // Derive version from environment override or package.json so it's not hardcoded
+    try {
+      const envVer = process.env.BOT_VERSION;
+      const pkgPath = path.join(this.projectRoot, 'package.json');
+      if (envVer) {
+        this.version = envVer;
+      } else if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        this.version = (pkg && pkg.version) ? String(pkg.version) : '0.0.0';
+      } else {
+        this.version = '0.0.0';
+      }
+    } catch (e) {
+      this.version = process.env.BOT_VERSION || '0.0.0';
+    }
     this.dataDir = process.env.BOT_DATA_DIR || path.join(this.projectRoot, 'data');
     this.load();
   }
@@ -27,6 +42,7 @@ class Config {
     this.ai = this.parseAIConfig();
     this.rateLimit = this.parseRateLimitConfig();
     this.logging = this.parseLoggingConfig();
+    this.profiling = this.parseProfilingConfig();
     this.security = this.parseSecurityConfig();
     this.dataDir = process.env.BOT_DATA_DIR || path.join(this.projectRoot, 'data');
     this.backupRetention = parseInt(process.env.BOT_BACKUP_RETENTION || '10', 10);
@@ -131,6 +147,16 @@ class Config {
   }
 
   /**
+   * Parse profiling configuration for long-running loops and diagnostics
+   */
+  parseProfilingConfig() {
+    return {
+      // If true, AgenticLoop will log memory/cpu stats each iteration.
+      agenticLoopEnabled: process.env.BOT_AGENTIC_LOOP_PROFILING === 'true',
+    };
+  }
+
+  /**
    * Parse security configuration
    */
   parseSecurityConfig() {
@@ -182,11 +208,17 @@ class Config {
       ai: this.ai,
       rateLimit: this.rateLimit,
       logging: this.logging,
+      profiling: this.profiling,
       security: this.security,
       dataDir: this.dataDir,
       backupRetention: this.backupRetention,
     };
   }
 }
+
+/**
+ * Default data directory (used by tests and utilities)
+ */
+Config.DATA_DIR = path.join(__dirname, '..', 'data');
 
 module.exports = Config;

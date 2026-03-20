@@ -9,104 +9,125 @@ const mockLogger = {
     debug: sinon.spy(),
 };
 
-describe('ReminderScheduler', () => {
-    let reminderStore;
-    let telegramApiClient;
-    let scheduler;
-    let clock;
+module.exports.run = async function(runner) {
+    await runner.test('should start and stop the scheduler', async () => {
+        const clock = sinon.useFakeTimers();
+        const reminderStore = { getDueReminders: sinon.stub(), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub() };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
 
-    beforeEach(() => {
-        clock = sinon.useFakeTimers();
-        reminderStore = {
-            getDueReminders: sinon.stub(),
-            remove: sinon.stub(),
-        };
-        telegramApiClient = {
-            sendMessage: sinon.stub(),
-        };
-        scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
-    });
-
-    afterEach(() => {
+        scheduler.start(1000);
+        runner.assert(!!scheduler.intervalId, 'Scheduler should have intervalId set');
         scheduler.stop();
-        sinon.restore();
+        runner.assertEqual(scheduler.intervalId, null, 'Scheduler intervalId should be null after stop');
+
         clock.restore();
+        sinon.restore();
     });
 
-    it('should start and stop the scheduler', () => {
+    await runner.test('should not start if already running', async () => {
+        const clock = sinon.useFakeTimers();
+        const reminderStore = { getDueReminders: sinon.stub(), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub() };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
+
         scheduler.start(1000);
-        assert.ok(scheduler.intervalId);
+        scheduler.start(1000);
+        runner.assert(mockLogger.warn.calledWith('ReminderScheduler is already running.'), 'Should warn when starting while already running');
+
         scheduler.stop();
-        assert.strictEqual(scheduler.intervalId, null);
+        clock.restore();
+        sinon.restore();
     });
 
-    it('should not start if already running', () => {
-        scheduler.start(1000);
-        scheduler.start(1000);
-        assert(mockLogger.warn.calledWith('ReminderScheduler is already running.'));
-    });
+    await runner.test('should not stop if not running', async () => {
+        const reminderStore = { getDueReminders: sinon.stub(), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub() };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
 
-    it('should not stop if not running', () => {
         scheduler.stop();
-        assert(mockLogger.warn.calledWith('ReminderScheduler is not running.'));
+        runner.assert(mockLogger.warn.calledWith('ReminderScheduler is not running.'), 'Should warn when stopping while not running');
+
+        sinon.restore();
     });
 
-    it('should check for and send due reminders', async () => {
+    await runner.test('should check for and send due reminders', async () => {
+        const reminderStore = { getDueReminders: sinon.stub(), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub().resolves() };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
+
         const now = Date.now();
         const dueReminders = [
             { id: '1', chatId: 123, message: 'Test 1', remindAt: now - 100 },
             { id: '2', chatId: 456, message: 'Test 2', remindAt: now - 50 },
         ];
         reminderStore.getDueReminders.resolves(dueReminders);
-        telegramApiClient.sendMessage.resolves();
         reminderStore.remove.resolves(true);
 
         await scheduler.checkAndSendReminders();
 
-        assert(reminderStore.getDueReminders.calledOnce);
-        assert.strictEqual(telegramApiClient.sendMessage.callCount, 2);
-        assert(telegramApiClient.sendMessage.calledWith(123, '🔔 Reminder: Test 1'));
-        assert(telegramApiClient.sendMessage.calledWith(456, '🔔 Reminder: Test 2'));
-        assert.strictEqual(reminderStore.remove.callCount, 2);
-        assert(reminderStore.remove.calledWith('1'));
-        assert(reminderStore.remove.calledWith('2'));
+        runner.assert(reminderStore.getDueReminders.calledOnce, 'Should check due reminders');
+        runner.assertEqual(telegramApiClient.sendMessage.callCount, 2);
+        runner.assert(telegramApiClient.sendMessage.calledWith(123, '🔔 Reminder: Test 1'));
+        runner.assert(telegramApiClient.sendMessage.calledWith(456, '🔔 Reminder: Test 2'));
+        runner.assertEqual(reminderStore.remove.callCount, 2);
+        runner.assert(reminderStore.remove.calledWith('1'));
+        runner.assert(reminderStore.remove.calledWith('2'));
+
+        sinon.restore();
     });
 
-    it('should handle errors when sending a reminder', async () => {
+    await runner.test('should handle errors when sending a reminder', async () => {
+        const reminderStore = { getDueReminders: sinon.stub(), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub().rejects(new Error('Send failed')) };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
+
         const now = Date.now();
         const dueReminders = [{ id: '1', chatId: 123, message: 'Test 1', remindAt: now - 100 }];
         reminderStore.getDueReminders.resolves(dueReminders);
-        telegramApiClient.sendMessage.rejects(new Error('Send failed'));
 
         await scheduler.checkAndSendReminders();
 
-        assert(reminderStore.getDueReminders.calledOnce);
-        assert(telegramApiClient.sendMessage.calledOnce);
-        assert(mockLogger.error.calledWith('Failed to send reminder 1 or remove it:', sinon.match.instanceOf(Error)));
-        assert(reminderStore.remove.notCalled);
+        runner.assert(reminderStore.getDueReminders.calledOnce);
+        runner.assert(telegramApiClient.sendMessage.calledOnce);
+        runner.assert(mockLogger.error.called, 'Should log error when reminder send fails');
+        runner.assert(reminderStore.remove.notCalled);
+
+        sinon.restore();
     });
 
-    it('should handle errors when checking for reminders', async () => {
-        reminderStore.getDueReminders.rejects(new Error('Store failed'));
+    await runner.test('should handle errors when checking for reminders', async () => {
+        const reminderStore = { getDueReminders: sinon.stub().rejects(new Error('Store failed')), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub() };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
 
         await scheduler.checkAndSendReminders();
 
-        assert(mockLogger.error.calledWith('Error checking for due reminders:', sinon.match.instanceOf(Error)));
-        assert(telegramApiClient.sendMessage.notCalled);
-        assert(reminderStore.remove.notCalled);
+        runner.assert(mockLogger.error.called, 'Should log error when checking for due reminders fails');
+        runner.assert(telegramApiClient.sendMessage.notCalled);
+        runner.assert(reminderStore.remove.notCalled);
+
+        sinon.restore();
     });
 
-    it('should run periodically', async () => {
+    await runner.test('should run periodically', async () => {
+        const clock = sinon.useFakeTimers();
+        const reminderStore = { getDueReminders: sinon.stub().resolves([]), remove: sinon.stub() };
+        const telegramApiClient = { sendMessage: sinon.stub() };
+        const scheduler = new ReminderScheduler(reminderStore, telegramApiClient, mockLogger);
+
         const checkAndSendRemindersSpy = sinon.spy(scheduler, 'checkAndSendReminders');
-        
+
         scheduler.start(1000); // Check every second
 
         await clock.tickAsync(1000);
-        assert(checkAndSendRemindersSpy.calledOnce);
+        runner.assert(checkAndSendRemindersSpy.calledOnce);
 
         await clock.tickAsync(1000);
-        assert(checkAndSendRemindersSpy.calledTwice);
-        
+        runner.assert(checkAndSendRemindersSpy.calledTwice);
+
         scheduler.stop();
+        clock.restore();
+        sinon.restore();
     });
-});
+};

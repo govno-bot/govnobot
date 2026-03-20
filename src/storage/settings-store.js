@@ -14,6 +14,7 @@ class SettingsStore {
     this.defaultSettings = {
       model: 'deepseek-r1:8b',
       systemPrompt: 'You are a helpful assistant.',
+      language: 'en',
     };
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   }
