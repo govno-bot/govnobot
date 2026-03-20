@@ -13,6 +13,15 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.4] - 2026-03-20 - Patch
+
+### ✅ Chore - Release + Deploy helper
+- Bumped package version to `1.10.4`.
+- Enhanced `govnodeploy.js` with `--tag`/`--push` options to create and optionally push a git tag for the generated release files.
+- Added repository git-identity helper scripts (`scripts/setup-git-identity.*`).
+
+---
+
 ## [1.10.1] - 2026-03-18 - Patch
 
 ### ✅ Chore - Version bump & docs

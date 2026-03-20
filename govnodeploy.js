@@ -119,6 +119,24 @@ async function cmdUpdate(version) {
 
   // Commit the generated files
   gitCommitFiles(filesToProcess, `chore(deploy): create versioned scripts for v${version}`);
+
+  // Optionally create a tag for the release and optionally push it
+  if (process.argv.includes('--tag') || process.argv.includes('-t')) {
+    try {
+      console.log(`Creating git tag v${version}`);
+      child_process.execFileSync('git', ['tag', '-a', `v${version}`, '-m', `v${version}`], { stdio: 'inherit' });
+      if (process.argv.includes('--push') || process.argv.includes('-p')) {
+        try {
+          console.log('Pushing tag to origin...');
+          child_process.execFileSync('git', ['push', 'origin', `v${version}`], { stdio: 'inherit' });
+        } catch (err) {
+          console.warn('Failed to push tag to origin:', err.message);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to create git tag:', err.message);
+    }
+  }
 }
 
 function cmdList() {
