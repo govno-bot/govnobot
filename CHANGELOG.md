@@ -13,6 +13,17 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.2] - 2026-03-20 - Patch
+
+### ✅ Fix - Reminders, Persona, Tests
+- Fixed nested file-locking deadlock in `ReminderStore` to avoid `Lock timeout for data\\reminders.json` errors and prevented the scheduler from crashing.
+- Escaped angle-bracket usage in `/persona` help output to avoid Telegram HTML parse errors (unsupported start tag).
+- Updated unit tests and mocks to match runtime behavior (`/ask` and metrics tests); all tests now pass.
+- Committed as: `chore(release): bump version to 1.10.2`.
+
+---
+
+
 
 ## [1.10.0] - 2026-03-05 - History Command Feature
 
