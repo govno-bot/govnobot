@@ -26,10 +26,9 @@ const personaCommand = {
     const availablePersonas = Object.keys(PERSONAS).join(', ');
 
     if (args.length === 0) {
-      await telegramApiClient.sendMessage(
-        chatId, 
-        `вќЊ Usage: /persona <name>\n\nAvailable personas: ${availablePersonas}\n\nYou can also set a custom persona using /settings systemPrompt <prompt>`
-      );
+      // Escape angle brackets for Telegram HTML parse mode
+      const usage = `вќЊ Usage: /persona &lt;name&gt;\n\nAvailable personas: ${availablePersonas}\n\nYou can also set a custom persona using /settings systemPrompt &lt;prompt&gt;`;
+      await telegramApiClient.sendMessage(chatId, usage);
       return;
     }
 
@@ -39,10 +38,8 @@ const personaCommand = {
       .replace(/>/g, "&gt;");
 
     if (!PERSONAS[selectedPersona]) {
-      await telegramApiClient.sendMessage(
-        chatId, 
-        `вќЊ Unknown persona: ${selectedPersona}\n\nAvailable personas: ${availablePersonas}`
-      );
+      const msg = `вќЊ Unknown persona: ${selectedPersona}\n\nAvailable personas: ${availablePersonas}`;
+      await telegramApiClient.sendMessage(chatId, msg);
       return;
     }
 

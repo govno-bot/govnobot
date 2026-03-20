@@ -22,7 +22,7 @@ module.exports.run = async function(runner) {
 
     await personaCommand.handler(context);
     runner.assert(sentMessage !== null, 'Should send a message');
-    runner.assert(sentMessage.includes('Usage: /persona <name>'), 'Should include usage message');
+    runner.assert(sentMessage.includes('Usage: /persona &lt;name&gt;'), 'Should include usage message');
     runner.assert(sentMessage.includes('pirate, therapist, yoda'), 'Should list personas');
   });
 
