@@ -40,3 +40,5 @@ temp/
 .cache/
 
 data
+
+progress.txt
