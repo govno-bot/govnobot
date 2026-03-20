@@ -42,7 +42,7 @@ module.exports.run = async function(runner) {
     assert.ok(sentMessage, 'Should verify message was sent');
     assert.ok(sentMessage.includes('Bot Status'), 'Should contain title "Bot Status"');
     assert.ok(sentMessage.includes('Version: ' + version), 'Should contain correct version');
-    assert.ok(sentMessage.includes('Status: 🟢 Online'), 'Should contain online status');
+    assert.ok(sentMessage.includes('Status: 🕺Online'), 'Should contain online status');
     assert.ok(sentMessage.includes('Uptime:'), 'Should contain uptime info');
     assert.ok(sentMessage.includes('Memory:'), 'Should contain memory info');
     assert.ok(sentMessage.includes('Default Model: test-model'), 'Should contain default model info');
