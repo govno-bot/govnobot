@@ -4,6 +4,17 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.5] - 2026-03-30 - Patch
+
+### ✅ Fix - Tests & Stability
+- Added Mocha-style globals shim to test worker to ensure mocha-style tests register correctly under the project's runner.
+- Fixed multiple `CommandHandler` routing and admin command behaviors to make unit and acceptance tests deterministic (streaming `/ask`, `/sh`, `/jack`, `/agent`, plugin reloads, ephemeral sessions).
+- Corrected moderation import path and other small fixes uncovered by the test suite.
+- All unit and acceptance tests pass in CI-style full run.
+
+---
+
+
 ## [1.10.3] - 2026-03-20 - Patch
 
 ### ✅ Chore - Release
