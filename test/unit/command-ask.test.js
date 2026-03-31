@@ -15,6 +15,80 @@ function cleanup() {
 }
 
 module.exports.run = async function(runner) {
+    await runner.test('/ask streams partial responses token-by-token', async () => {
+      cleanup();
+      let sentMessages = [];
+      const fakeClient = {
+        sendMessage: async (chatId, msg) => { sentMessages.push(msg); },
+        sendChatAction: async () => {}
+      };
+      // Simulate streaming: call onToken for each char
+      const fakeChain = {
+        call: async (input, opts) => {
+          if (opts && typeof opts.onToken === 'function') {
+            for (const c of 'streamed') {
+              opts.onToken(c);
+            }
+          }
+          return 'streamed';
+        }
+      };
+      const config = {
+          dataDir: TEST_DIR,
+          ai: { availableModels: ['gpt'] },
+          telegram: {},
+          security: {}
+      };
+      const handler = new (require('../../src/commands/command-handler'))(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+      await handler.handleAsk({
+          chatId: 123,
+          args: ['stream', 'please'],
+          command: 'ask'
+      });
+      runner.assert(sentMessages.join('').includes('streamed'), 'Should send streamed response');
+      cleanup();
+    });
+
+    await runner.test('/ask aborts streaming if requested', async () => {
+      cleanup();
+      let sentMessages = [];
+      let abortHandler;
+      const fakeClient = {
+        sendMessage: async (chatId, msg) => { sentMessages.push(msg); },
+        sendChatAction: async () => {}
+      };
+      // Simulate streaming: call onToken for each char, but abort after 3
+      const fakeChain = {
+        call: async (input, opts) => {
+          let count = 0;
+          if (opts && typeof opts.onToken === 'function' && typeof opts.isAborted === 'function') {
+            for (const c of 'abcdefg') {
+              if (opts.isAborted()) break;
+              opts.onToken(c);
+              count++;
+              if (count === 3) abortHandler && abortHandler();
+            }
+          }
+          return 'abc';
+        }
+      };
+      const config = {
+          dataDir: TEST_DIR,
+          ai: { availableModels: ['gpt'] },
+          telegram: {},
+          security: {}
+      };
+      const handler = new (require('../../src/commands/command-handler'))(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+      await handler.handleAsk({
+          chatId: 123,
+          args: ['abort', 'test'],
+          command: 'ask',
+          setAbortHandler: (fn) => { abortHandler = fn; }
+      });
+      runner.assert(sentMessages.join('').includes('abc'), 'Should send only partial response before abort');
+      runner.assert(!sentMessages.join('').includes('d'), 'Should not send tokens after abort');
+      cleanup();
+    });
   const CommandHandler = require('../../src/commands/command-handler');
 
   await runner.test('/ask requests AI and returns response', async () => {
@@ -24,13 +98,13 @@ module.exports.run = async function(runner) {
       sendMessage: async (chatId, msg) => { sentMessages.push(msg); },
       sendChatAction: async () => {} 
     };
-    
     // Mock FallbackChain: accept the messages array and return answer when user content matches
     const fakeChain = {
       call: async (input) => {
         if (Array.isArray(input)) {
           const user = input.find(m => m.role === 'user');
-          if (user && user.content === 'What is life?') return '42';
+          // Accept both direct and context-windowed prompt
+          if (user && (user.content === 'What is life?' || user.content.endsWith('What is life?'))) return '42';
         }
         return 'Unknown';
       }
@@ -43,7 +117,6 @@ module.exports.run = async function(runner) {
         security: {} 
     };
     const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
-    
     // Call ask
     await handler.handleAsk({ 
         chatId: 123, 

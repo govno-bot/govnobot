@@ -1,6 +1,84 @@
 // test/unit/command-handler.test.js
 // TDD/BDD: Command Handler unit tests
 module.exports.run = async function(runner) {
+
+  await runner.test('/formdemo sends inline keyboard and handles response', async () => {
+    const CommandHandler = require('../../src/commands/command-handler');
+    let sentMsg = null;
+    let answerCb = null;
+    const fakeClient = {
+      sendMessage: async (chatId, msg, opts) => { sentMsg = { msg, opts }; },
+      answerCallbackQuery: async (id) => { answerCb = id; }
+    };
+    const config = { telegram: { adminUsername: 'admin' }, ai: { availableModels: [] } };
+    const handler = new CommandHandler(fakeClient, config, {}, null, null, null, null, null, { watchPlugins: false });
+    // Test sending the form
+    await handler.handle({ chatId: 42, text: '/formdemo' });
+    runner.assert(sentMsg && sentMsg.msg.includes('favorite color'), 'Should send form question');
+    runner.assert(sentMsg && sentMsg.opts && sentMsg.opts.reply_markup && sentMsg.opts.reply_markup.inline_keyboard, 'Should include inline keyboard');
+    // Test handling a callback query (form response)
+    sentMsg = null;
+    answerCb = null;
+    await handler.handle({ callbackQuery: { id: 'cbid1', data: 'form_color_blue', message: { chat: { id: 42 } } } });
+    runner.assert(answerCb === 'cbid1', 'Should acknowledge callback query');
+    runner.assert(sentMsg && sentMsg.msg.includes('You selected: Blue'), 'Should respond with selected color');
+  });
+
+    await runner.test('/settings shows and updates theme, verbosity, notifications', async () => {
+      const CommandHandler = require('../../src/commands/command-handler');
+      const SettingsStore = require('../../src/storage/settings-store');
+      const fs = require('fs');
+      const path = require('path');
+      const tmpDir = path.join(__dirname, '../../data/test-settings-cmd');
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      const userId = 12345;
+      const config = { dataDir: path.join(__dirname, '../../data'), ai: { defaultModel: 'gpt' }, telegram: { adminUsername: 'admin' } };
+      let sentMsg = '';
+      const fakeClient = { sendMessage: async (chatId, msg) => { sentMsg = msg; }, sendChatAction: async () => {} };
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      // Patch settings dir for this test
+      handler.config.dataDir = path.join(__dirname, '../../data');
+      // Clean up file
+      const filePath = path.join(config.dataDir, 'settings', userId + '.json');
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+      // Show settings (should include new keys)
+      await handler.handleSettings({ chatId: userId, args: [] });
+      runner.assert(sentMsg.includes('Theme:'), 'Should show theme in settings');
+      runner.assert(sentMsg.includes('Verbosity:'), 'Should show verbosity in settings');
+      runner.assert(sentMsg.includes('Notifications:'), 'Should show notifications in settings');
+
+      // Set theme to dark
+      await handler.handleSettings({ chatId: userId, args: ['theme', 'dark'] });
+      const store = new SettingsStore(userId, path.join(config.dataDir, 'settings'));
+      const loaded = await store.load();
+      runner.assert(loaded.theme === 'dark', 'Theme should be set to dark');
+
+      // Set verbosity to verbose
+      await handler.handleSettings({ chatId: userId, args: ['verbosity', 'verbose'] });
+      const loaded2 = await store.load();
+      runner.assert(loaded2.verbosity === 'verbose', 'Verbosity should be set to verbose');
+
+      // Set notifications to mentions
+      await handler.handleSettings({ chatId: userId, args: ['notifications', 'mentions'] });
+      const loaded3 = await store.load();
+      runner.assert(loaded3.notifications === 'mentions', 'Notifications should be set to mentions');
+
+      // Invalid theme
+      await handler.handleSettings({ chatId: userId, args: ['theme', 'blue'] });
+      runner.assert(sentMsg.includes('Invalid theme'), 'Should reject invalid theme');
+
+      // Invalid verbosity
+      await handler.handleSettings({ chatId: userId, args: ['verbosity', 'super'] });
+      runner.assert(sentMsg.includes('Invalid verbosity'), 'Should reject invalid verbosity');
+
+      // Invalid notifications
+      await handler.handleSettings({ chatId: userId, args: ['notifications', 'push'] });
+      runner.assert(sentMsg.includes('Invalid notifications'), 'Should reject invalid notifications');
+
+      // Clean up
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    });
   const pkg = require('../../package.json');
   const version = pkg.version;
     await runner.test('/sh as admin executes shell command and returns output', async () => {
@@ -232,5 +310,31 @@ module.exports.run = async function(runner) {
       
       runner.assert(handledArgs !== null, 'Should have routed to handleAsk on reply');
       runner.assert(handledArgs.join(' ') === 'Is this working?', 'Should pass query properly');
+    });
+
+    await runner.test('/ephemeral starts ephemeral session and /end ends it, no disk writes', async () => {
+      const CommandHandler = require('../../src/commands/command-handler');
+      const fs = require('fs');
+      const path = require('path');
+      const userId = 55555;
+      const config = { dataDir: path.join(__dirname, '../../data'), ai: { defaultModel: 'gpt' }, telegram: { adminUsername: 'admin' } };
+      let sentMsgs = [];
+      const fakeClient = { sendMessage: async (chatId, msg) => { sentMsgs.push(msg); }, sendChatAction: async () => {} };
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      // Clean up any persistent file
+      const filePath = path.join(config.dataDir, 'history', userId + '.json');
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+      // Start ephemeral session
+      await handler.handle({ chatId: userId, text: '/ephemeral' });
+      runner.assert(sentMsgs[sentMsgs.length-1].includes('Ephemeral session started'), 'Should confirm ephemeral session started');
+      // Add a message (simulate chat)
+      if (!handler.ephemeralSessions[userId]) throw new Error('Ephemeral session not tracked');
+      handler.ephemeralSessions[userId].history.push({ role: 'user', content: 'test', timestamp: new Date().toISOString() });
+      // End ephemeral session
+      await handler.handle({ chatId: userId, text: '/end' });
+      runner.assert(sentMsgs[sentMsgs.length-1].includes('Ephemeral session ended'), 'Should confirm ephemeral session ended');
+      // Ensure no file was written
+      runner.assert(!fs.existsSync(filePath), 'No history file should be written for ephemeral session');
     });
 };

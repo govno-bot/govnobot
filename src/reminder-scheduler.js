@@ -1,9 +1,18 @@
+
+const RecoveryManager = require('./utils/recovery-manager');
+
 class ReminderScheduler {
-    constructor(reminderStore, telegramApiClient, logger) {
+    constructor(reminderStore, telegramApiClient, logger, adminNotifier = null) {
         this.reminderStore = reminderStore;
         this.telegramApiClient = telegramApiClient;
         this.logger = logger;
         this.intervalId = null;
+        this.recovery = new RecoveryManager({
+            logger,
+            adminNotifier,
+            maxRetries: 3,
+            backoffBaseMs: 60000
+        });
     }
 
     start(interval = 60000) { // Check every minute
@@ -32,14 +41,18 @@ class ReminderScheduler {
             const dueReminders = await this.reminderStore.getDueReminders(now);
 
             for (const reminder of dueReminders) {
+                if (!this.recovery.shouldRetry(reminder.id)) {
+                    this.logger.warn(`Reminder ${reminder.id} exceeded max retries, skipping.`);
+                    continue;
+                }
                 try {
                     await this.telegramApiClient.sendMessage(reminder.chatId, `🔔 Reminder: ${reminder.message}`);
                     await this.reminderStore.remove(reminder.id);
                     this.logger.info(`Sent reminder ${reminder.id} to chat ${reminder.chatId}`);
+                    this.recovery.recordSuccess(reminder.id);
                 } catch (error) {
                     this.logger.error(`Failed to send reminder ${reminder.id} or remove it:`, error);
-                    // Decide on a retry strategy or if the reminder should be kept or removed.
-                    // For now, we'll leave it and it will be picked up again.
+                    this.recovery.recordFailure(reminder.id, error);
                 }
             }
         } catch (error) {

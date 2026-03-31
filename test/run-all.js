@@ -124,6 +124,7 @@ class TestRunner {
       this.stats.failed++;
       this.recordFailure(name, error.message, error);
       console.log(`  ${colors.red}✗${colors.reset} ${name} failed: ${error.message}`);
+      if (error && error.stack) console.log(error.stack);
     }
   }
 

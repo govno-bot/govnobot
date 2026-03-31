@@ -19,10 +19,11 @@ GovnoBot is a zero-dependency Telegram AI bot written in Node.js, exposing its f
   - **Input:** None
   - **Output:** Command list
 
-- `/ask <question>`
+ - `/ask <question>`
   - **Description:** Asks the AI a question.
   - **Input:** User question (string)
   - **Output:** AI-generated answer (may be split into multiple messages)
+  - **Context Window:** Uses the last N messages (default: 8), summary memory (recent assistant answers), and a pinned system prompt to provide context to the AI for more coherent responses.
   - **Errors:** If AI unavailable, returns a friendly error message.
 
 - `/model [<name>]`

@@ -20,18 +20,33 @@ class OllamaClient {
   }
 
   /**
-   * Send a prompt to Ollama and get a response
+   * Send a prompt to Ollama and get a response (streaming supported)
    * @param {string} prompt
    * @param {Object} [options]
+   * @param {function(string):void} [options.onToken] - Called for each token/partial
+   * @param {function():boolean} [options.isAborted] - Should return true if user aborted
    * @returns {Promise<string>} response
    */
   async generate(prompt, options = {}) {
+    return this.generateStream(prompt, options);
+  }
+
+  /**
+   * Stream Ollama response tokens (calls onToken for each partial)
+   * @param {string} prompt
+   * @param {Object} [options]
+   * @param {function(string):void} [options.onToken] - Called for each token/partial
+   * @param {function():boolean} [options.isAborted] - Should return true if user aborted
+   * @returns {Promise<string>} Full response
+   */
+  async generateStream(prompt, options = {}) {
     const startTs = Date.now();
     const url = new URL('/api/generate', this.baseUrl);
+    const stream = options.stream !== false;
     const body = JSON.stringify({
       model: options.model || this.model,
       prompt,
-      stream: false
+      stream
     });
     const isHttps = url.protocol === 'https:';
     const reqOpts = {
@@ -45,24 +60,59 @@ class OllamaClient {
       }
     };
     return new Promise((resolve, reject) => {
+      let full = '';
+      let done = false;
       const req = (isHttps ? https : http).request(reqOpts, res => {
-        let data = '';
         res.setEncoding('utf8');
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => {
-          const latencyMs = Date.now() - startTs;
-          try {
-            const json = JSON.parse(data);
-            if (json.response) {
-              try { metrics.record(this.name, { latencyMs, error: false, cost: 0, model: options.model || this.model }); } catch (e) {}
-              return resolve(json.response);
+        if (!stream) {
+          let data = '';
+          res.on('data', chunk => { data += chunk; });
+          res.on('end', () => {
+            const latencyMs = Date.now() - startTs;
+            try {
+              const json = JSON.parse(data);
+              if (json.response) {
+                try { metrics.record(this.name, { latencyMs, error: false, cost: 0, model: options.model || this.model }); } catch (e) {}
+                return resolve(json.response);
+              }
+              try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (e) {}
+              reject(new Error(json.error || 'No response from Ollama'));
+            } catch (e) {
+              try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (er) {}
+              reject(new Error('Invalid JSON from Ollama: ' + e.message));
             }
-            try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (e) {}
-            reject(new Error(json.error || 'No response from Ollama'));
-          } catch (e) {
-            try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (er) {}
-            reject(new Error('Invalid JSON from Ollama: ' + e.message));
+          });
+          return;
+        }
+        // Streaming mode: Ollama streams JSON lines, each with a partial response
+        let buffer = '';
+        res.on('data', chunk => {
+          if (done) return;
+          buffer += chunk;
+          let idx;
+          while ((idx = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 1);
+            if (!line) continue;
+            try {
+              const json = JSON.parse(line);
+              if (json.done) {
+                done = true;
+                return resolve(full);
+              }
+              if (typeof json.response === 'string') {
+                full += json.response;
+                if (typeof options.onToken === 'function') options.onToken(json.response);
+              }
+            } catch (e) {}
+            if (typeof options.isAborted === 'function' && options.isAborted()) {
+              done = true;
+              return resolve(full);
+            }
           }
+        });
+        res.on('end', () => {
+          if (!done) resolve(full);
         });
       });
       req.on('error', err => {
@@ -113,6 +163,7 @@ class OllamaClient {
 
   /**
    * Adapter for FallbackChain
+   * Supports streaming if options.onToken is provided.
    */
   async call(prompt, options) {
     let promptString = prompt;
@@ -123,6 +174,9 @@ class OllamaClient {
         if (m.role === 'assistant') return `Assistant: ${m.content}`;
         return m.content;
       }).join('\n\n');
+    }
+    if (options && typeof options.onToken === 'function') {
+      return this.generateStream(promptString, options);
     }
     return this.generate(promptString, options);
   }

@@ -21,18 +21,31 @@ class OpenAIClient {
   }
 
   /**
-   * Send a chat completion request
+   * Send a chat completion request (full response)
    * @param {Array<{role: string, content: string}>} messages
    * @param {Object} [options]
    * @returns {Promise<string>} response
    */
   async chat(messages, options = {}) {
+    return this.chatStream(messages, options);
+  }
+
+  /**
+   * Stream chat completion tokens (calls onToken for each partial)
+   * @param {Array<{role: string, content: string}>} messages
+   * @param {Object} [options]
+   * @param {function(string):void} [options.onToken] - Called for each token/partial
+   * @param {function():boolean} [options.isAborted] - Should return true if user aborted
+   * @returns {Promise<string>} Full response
+   */
+  async chatStream(messages, options = {}) {
     const startTs = Date.now();
     const url = new URL('/v1/chat/completions', this.baseUrl);
+    const stream = options.stream !== false;
     const body = JSON.stringify({
       model: options.model || this.model,
       messages,
-      stream: false
+      stream
     });
     const reqOpts = {
       method: 'POST',
@@ -46,32 +59,69 @@ class OpenAIClient {
       }
     };
     return new Promise((resolve, reject) => {
+      let full = '';
+      let done = false;
       const req = https.request(reqOpts, res => {
-        let data = '';
         res.setEncoding('utf8');
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            const latencyMs = Date.now() - startTs;
-            const usage = json.usage || {};
-            const totalTokens = Number(usage.total_tokens || 0);
-            const estimatedCost = 0; // keep 0 by default; real cost calc requires pricing table
-
-            if (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) {
-              // Record metrics (successful call)
-              try { metrics.record(this.name, { latencyMs, error: false, cost: estimatedCost, model: options.model || this.model }); } catch (e) {}
-              return resolve(json.choices[0].message.content);
+        if (!stream) {
+          // Non-streaming fallback
+          let data = '';
+          res.on('data', chunk => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              const latencyMs = Date.now() - startTs;
+              const usage = json.usage || {};
+              const totalTokens = Number(usage.total_tokens || 0);
+              const estimatedCost = 0;
+              if (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) {
+                try { metrics.record(this.name, { latencyMs, error: false, cost: estimatedCost, model: options.model || this.model }); } catch (e) {}
+                return resolve(json.choices[0].message.content);
+              }
+              try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (e) {}
+              reject(new Error(json.error?.message || 'No response from OpenAI'));
+            } catch (e) {
+              const latencyMs = Date.now() - startTs;
+              try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (er) {}
+              reject(new Error('Invalid JSON from OpenAI: ' + e.message));
             }
-
-            // Record error metric
-            try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (e) {}
-            reject(new Error(json.error?.message || 'No response from OpenAI'));
-          } catch (e) {
-            const latencyMs = Date.now() - startTs;
-            try { metrics.record(this.name, { latencyMs, error: true, cost: 0, model: options.model || this.model }); } catch (er) {}
-            reject(new Error('Invalid JSON from OpenAI: ' + e.message));
+          });
+          return;
+        }
+        // Streaming mode
+        let buffer = '';
+        res.on('data', chunk => {
+          if (done) return;
+          buffer += chunk;
+          // OpenAI streams as lines: data: {...}\n, ending with [DONE]
+          let idx;
+          while ((idx = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 1);
+            if (!line) continue;
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (data === '[DONE]') {
+                done = true;
+                return resolve(full);
+              }
+              try {
+                const json = JSON.parse(data);
+                const delta = json.choices?.[0]?.delta?.content;
+                if (typeof delta === 'string') {
+                  full += delta;
+                  if (typeof options.onToken === 'function') options.onToken(delta);
+                }
+              } catch (e) {}
+            }
+            if (typeof options.isAborted === 'function' && options.isAborted()) {
+              done = true;
+              return resolve(full);
+            }
           }
+        });
+        res.on('end', () => {
+          if (!done) resolve(full);
         });
       });
       req.on('error', err => {
@@ -86,10 +136,13 @@ class OpenAIClient {
 
   /**
    * Adapter for FallbackChain
+   * Supports streaming if options.onToken is provided.
    */
   async call(prompt, options) {
-    // Convert string prompt to messages format
     const messages = Array.isArray(prompt) ? prompt : [{ role: 'user', content: prompt }];
+    if (options && typeof options.onToken === 'function') {
+      return this.chatStream(messages, options);
+    }
     return this.chat(messages, options);
   }
 

@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 class SettingsStore {
-  constructor(userId, dataDir) {
+  constructor(userId, dataDir, ephemeralSession = null) {
     this.userId = userId;
     this.dataDir = dataDir;
     this.filePath = path.join(dataDir, `${userId}.json`);
@@ -15,11 +15,18 @@ class SettingsStore {
       model: 'deepseek-r1:8b',
       systemPrompt: 'You are a helpful assistant.',
       language: 'en',
+      theme: 'light',
+      verbosity: 'normal',
+      notifications: 'all',
     };
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    this.ephemeralSession = ephemeralSession;
+    if (!this.ephemeralSession && !fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   }
 
   async load() {
+    if (this.ephemeralSession) {
+      return { ...this.defaultSettings, ...this.ephemeralSession.settings };
+    }
     if (!fs.existsSync(this.filePath)) {
       return { ...this.defaultSettings };
     }
@@ -36,6 +43,10 @@ class SettingsStore {
 
   async save(settings) {
     const merged = { ...this.defaultSettings, ...settings };
+    if (this.ephemeralSession) {
+      this.ephemeralSession.settings = { ...settings };
+      return merged;
+    }
     await fs.promises.writeFile(this.filePath, JSON.stringify(merged, null, 2), 'utf8');
     return merged;
   }
@@ -47,6 +58,10 @@ class SettingsStore {
   }
 
   async reset() {
+    if (this.ephemeralSession) {
+      this.ephemeralSession.settings = {};
+      return { ...this.defaultSettings };
+    }
     if (fs.existsSync(this.filePath)) {
       await fs.promises.unlink(this.filePath);
     }

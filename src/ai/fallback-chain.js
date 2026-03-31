@@ -24,6 +24,10 @@ class FallbackChain {
   async call(input, opts) {
     const errors = [];
     const now = Date.now();
+    // Extract streaming options if present
+    const streamingOpts = {};
+    if (opts && typeof opts.onToken === 'function') streamingOpts.onToken = opts.onToken;
+    if (opts && typeof opts.isAborted === 'function') streamingOpts.isAborted = opts.isAborted;
 
     // Try providers in order, skipping those that are recently marked unhealthy
     for (const provider of this.providers) {
@@ -35,7 +39,7 @@ class FallbackChain {
       }
 
       try {
-        const res = await provider.call(input, opts);
+        const res = await provider.call(input, { ...opts, ...streamingOpts });
         try {
           metrics.emit('provider_selected', { provider: pname, ts: Date.now(), model: (opts && opts.model) || provider.model || null });
         } catch (e) {}
@@ -58,7 +62,7 @@ class FallbackChain {
         const health = this._health.get(pname);
         if (health && health.healthy === false && (Date.now() - health.ts) < this.healthTTL) continue;
         try {
-          const res = await provider.call(input, opts);
+          const res = await provider.call(input, { ...opts, ...streamingOpts });
           this._health.set(pname, { healthy: true, ts: Date.now() });
           return res;
         } catch (err) {

@@ -58,6 +58,11 @@
 ┌───────────────────▼────────────┐  ┌──────────────▼──────────────────┐
 │  TELEGRAM API (Phase 4)        │  │  AI INTEGRATION (Phase 5)       │
 ├────────────────────────────────┤  ├─────────────────────────────────┤
+│                                 │  │  • Context Window Management:   │
+│                                 │  │    - Last N messages (default: 8)│
+│                                 │  │    - Summary memory (recent assistant answers)│
+│                                 │  │    - Pinned system prompt (user/system)│
+│                                 │  │  • Prompt assembly for LLMs     │
 │  src/telegram/                 │  │  src/ai/                        │
 │  • api-client.js  ⏳           │  │  • ollama.js  ⏳                │
 │  • polling.js  ⏳              │  │  • openai.js  ⏳                │

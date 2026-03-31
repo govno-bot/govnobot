@@ -1,0 +1,745 @@
+
+> govnobot-node@1.10.4 test
+> node test/run-all.js
+
+[36mGovnoBot Test Runner[0m
+============================================================
+Found 54 test file(s)
+
+
+[36mRunning:[0m test\unit\admin-validator.test.js
+  [📎[0m should return true if userId is in adminList (number)
+  [📎[0m should return true if userId is in adminList (string)
+  [📎[0m should return false if userId is not in adminList
+  [📎[0m should return false if adminList is empty
+  [📎[0m should return false if adminList is null
+  [📎[0m should return false if adminList is undefined
+  [📎[0m should return false if adminList is an object
+  [📎[0m should handle string/number equivalence (string userId, number list)
+  [📎[0m should handle string/number equivalence (number userId, string list)
+  [📎[0m should return false if userId is undefined
+  [📎[0m should return false if userId is null
+  [📎[0m test\unit\admin-validator.test.js
+
+[36mRunning:[0m test\unit\agentic-loop.test.js
+  [📎[0m starts with isRunning false
+  [📎[0m sets isRunning to true when start() called
+  [📎[0m sets isRunning to false when stop() called
+  [📎[0m profiling logs memory/cpu stats
+  [📎[0m executeIteration parses thoughts correctly
+  [📎[0m executeIteration parses goals correctly
+  [📎[0m schedules reminder correctly
+  [📎[0m scheduled reminder message matches
+  [📎[0m test\unit\agentic-loop.test.js
+
+[36mRunning:[0m test\unit\audit-logger.test.js
+
+ЁЯФТ Testing Audit Logger
+  [📎[0m log file created
+  [📎[0m appends log entries
+  [📎[0m timestamp included
+  [📎[0m user id matches
+  [📎[0m action matches
+  [📎[0m details match
+  [📎[0m signature included
+  [📎[0m signature matches expected calculation
+  [📎[0m verifyEntry returns true for valid entry
+  [📎[0m verifyEntry returns false for tampered entry
+  [📎[0m throws correct error for missing secret key
+  [📎[0m test\unit\audit-logger.test.js
+
+[36mRunning:[0m test\unit\backup-manager.test.js
+  [📎[0m should create a backup with timestamped folder
+  [📎[0m should list all backups in reverse chronological order
+  [📎[0m should restore a backup by folder name
+  [📎[0m should throw if backup does not exist
+  [📎[0m should handle concurrent backup creation with file lock
+  [📎[0m should clean up old backups if maxBackups is set
+  [📎[0m test\unit\backup-manager.test.js
+
+[36mRunning:[0m test\unit\campaign-store.test.js
+  [📎[0m should initialize with empty state if no file
+  [📎[0m should save and load state
+  [📎[0m test\unit\campaign-store.test.js
+
+[36mRunning:[0m test\unit\chunker.test.js
+
+ЁЯУж Testing Message Chunker
+  [📎[0m chunk() returns an array
+  [📎[0m Short message has 1 chunk
+  [📎[0m Chunk content matches input
+  [📎[0m Message at limit has 1 chunk
+  [📎[0m Chunk is exactly 4096 chars
+  [📎[0m Message over limit is split into 2 chunks
+  [📎[0m First chunk is <= 4096 chars
+  [📎[0m Second chunk is <= 4096 chars
+  [📎[0m Long message splits into 2 chunks
+  [📎[0m No characters lost
+  [📎[0m Content matches after reassembly
+  [📎[0m Message with newlines is chunked
+  [📎[0m All content preserved
+  [📎[0m Empty message returns 1 chunk
+  [📎[0m Chunk is empty string
+  [📎[0m Handles null gracefully
+  [📎[0m Handles undefined gracefully
+  [📎[0m Custom chunk size respected
+  [📎[0m First chunk <= custom size
+  [📎[0m Code blocks are handled
+  [📎[0m Code block markers preserved
+  [📎[0m Unicode chars preserved correctly
+  [📎[0m test\unit\chunker.test.js
+
+[36mRunning:[0m test\unit\command-ask.test.js
+LOADING COMMAND ASK TEST
+  Running: /ask streams partial responses token-by-token
+  [31mтЬЧ[0m /ask streams partial responses token-by-token failed: Unexpected token 'this'
+  Running: /ask aborts streaming if requested
+  [31mтЬЧ[0m /ask aborts streaming if requested failed: Unexpected token 'this'
+  [31mтЬЧ[0m test\unit\command-ask.test.js
+
+[36mRunning:[0m test\unit\command-dashboard.test.js
+  [31mтЬЧ[0m test\unit\command-dashboard.test.js
+
+[36mRunning:[0m test\unit\command-gm.test.js
+  [📎[0m should send usage info if no args provided
+  [📎[0m should send typing action
+  [📎[0m should start a stateful campaign
+  [📎[0m should stop a campaign
+  [📎[0m should take action in a campaign
+  [📎[0m should handle stateless scenario
+  [📎[0m should handle AI failure in stateless scenario
+  [📎[0m test\unit\command-gm.test.js
+
+[36mRunning:[0m test\unit\command-handler.test.js
+  Running: /formdemo sends inline keyboard and handles response
+  [31mтЬЧ[0m /formdemo sends inline keyboard and handles response failed: Unexpected token 'this'
+  Running: /settings shows and updates theme, verbosity, notifications
+  [31mтЬЧ[0m /settings shows and updates theme, verbosity, notifications failed: Unexpected token 'this'
+  Running: /sh as admin executes shell command and returns output
+  [31mтЬЧ[0m /sh as admin executes shell command and returns output failed: Unexpected token 'this'
+  Running: /jack as admin executes script and returns confirmation
+  [31mтЬЧ[0m /jack as admin executes script and returns confirmation failed: Unexpected token 'this'
+  Running: /sh as non-admin returns admin error
+  [31mтЬЧ[0m /sh as non-admin returns admin error failed: Unexpected token 'this'
+  Running: /agent as admin adds goal to notepad
+  [31mтЬЧ[0m /agent as admin adds goal to notepad failed: Unexpected token 'this'
+  Running: /agent as non-admin returns admin error
+  [31mтЬЧ[0m /agent as non-admin returns admin error failed: Unexpected token 'this'
+  Running: registers and routes public commands
+  [31mтЬЧ[0m registers and routes public commands failed: Unexpected token 'this'
+  Running: registers and routes admin commands
+  [31mтЬЧ[0m registers and routes admin commands failed: Unexpected token 'this'
+  Running: returns error for unknown command
+  [31mтЬЧ[0m returns error for unknown command failed: Unexpected token 'this'
+  Running: loads plugin commands from plugins directory and supports reload
+  [31mтЬЧ[0m loads plugin commands from plugins directory and supports reload failed: Unexpected token 'this'
+  Running: handles execution errors gracefully
+  [31mтЬЧ[0m handles execution errors gracefully failed: Unexpected token 'this'
+  Running: responds to inline mentions without prefix
+  [31mтЬЧ[0m responds to inline mentions without prefix failed: Unexpected token 'this'
+  Running: responds to direct replies without prefix
+  [31mтЬЧ[0m responds to direct replies without prefix failed: Unexpected token 'this'
+  Running: /ephemeral starts ephemeral session and /end ends it, no disk writes
+  [31mтЬЧ[0m /ephemeral starts ephemeral session and /end ends it, no disk writes failed: Unexpected token 'this'
+  [31mтЬЧ[0m test\unit\command-handler.test.js
+
+[36mRunning:[0m test\unit\command-history.test.js
+  [31mтЬЧ[0m test\unit\command-history.test.js
+
+[36mRunning:[0m test\unit\command-imagine.test.js
+LOADING COMMAND IMAGINE TEST
+  Running: /imagine with no prompt
+  Running: /imagine with prompt (success)
+  Running: /imagine gracefully handles AI errors
+  тЬУ test/unit/command-imagine.test.js
+
+  [📎[0m test\unit\command-imagine.test.js
+
+[36mRunning:[0m test\unit\command-logs.test.js
+  Running: command-logs: should return error if logs file is not configured
+  Running: command-logs: should return error if logs file does not exist
+  Running: command-logs: should return logs if log file exists
+  Running: command-logs: should apply custom line count if provided in args
+  Running: command-logs: should handle HTML escaping
+  Running: command-logs: should truncate logs if they are too long
+  [📎[0m test\unit\command-logs.test.js
+
+[36mRunning:[0m test\unit\command-macro.test.js
+  [31mтЬЧ[0m test\unit\command-macro.test.js
+
+[36mRunning:[0m test\unit\command-marketplace.test.js
+  [31mтЬЧ[0m test\unit\command-marketplace.test.js
+
+[36mRunning:[0m test\unit\command-model.test.js
+  [31mтЬЧ[0m test\unit\command-model.test.js
+
+[36mRunning:[0m test\unit\command-persona.test.js
+  Running: persona command requires args and lists available personas
+  [📎[0m Should send a message
+  [📎[0m Should include usage message
+  [📎[0m Should list personas
+  Running: persona command rejects unknown persona
+  [📎[0m Should send a message
+  [📎[0m Should include unknown persona message
+  Running: persona command updates systemPrompt for valid persona
+  [📎[0m Should send a message
+  [📎[0m Should send success message
+  [📎[0m Settings file should exist
+  [📎[0m System prompt should be updated to pirate persona
+  [📎[0m test\unit\command-persona.test.js
+
+[36mRunning:[0m test\unit\command-pin.test.js
+  [31mтЬЧ[0m test\unit\command-pin.test.js
+
+[36mRunning:[0m test\unit\command-remind.test.js
+  Running: should show usage if args are insufficient
+  [📎[0m Should send usage message when no args provided
+  Running: should reject invalid time format
+  [📎[0m Should reject invalid time formats
+  Running: should set a reminder successfully
+  [📎[0m Should add reminder to store
+  [📎[0m Reminder chatId should match
+  [📎[0m Reminder message should match
+  [📎[0m Reminder time should be in the future
+  [📎[0m Should send confirmation message
+  [📎[0m Should confirm reminder scheduled
+  [📎[0m Logger should be called
+  Running: should handle errors when setting a reminder
+  [📎[0m Should attempt to add reminder
+  [📎[0m Should notify user about the failure
+  [📎[0m Logger should record error
+  [📎[0m test\unit\command-remind.test.js
+
+[36mRunning:[0m test\unit\command-settings.test.js
+  [31mтЬЧ[0m test\unit\command-settings.test.js
+
+[36mRunning:[0m test\unit\command-sh.test.js
+  [31mтЬЧ[0m test\unit\command-sh.test.js
+
+[36mRunning:[0m test\unit\command-status-version.test.js
+  [31mтЬЧ[0m test\unit\command-status-version.test.js
+
+[36mRunning:[0m test\unit\command-wiki.test.js
+  [31mтЬЧ[0m test\unit\command-wiki.test.js
+
+[36mRunning:[0m test\unit\crypto-utils.test.js
+  [📎[0m randomBytes returns a buffer
+  [📎[0m randomBytes returns correct length
+  [📎[0m randomBytes throws on size 0
+  [📎[0m randomBytes throws on negative size
+  [📎[0m randomBytes throws on non-number
+  [📎[0m sha256 returns a buffer
+  [📎[0m sha256 returns 32 bytes
+  [📎[0m sha256 hash matches
+  [📎[0m sha256 hash matches buffer
+  [📎[0m hmacSha256 returns a buffer
+  [📎[0m hmacSha256 returns 32 bytes
+  [📎[0m base64Encode encodes string
+  [📎[0m base64Decode decodes string
+  [📎[0m base64Encode encodes buffer
+  [📎[0m base64Decode decodes buffer
+  [📎[0m timingSafeEqual true for equal buffers
+  [📎[0m timingSafeEqual false for different buffers
+  [📎[0m timingSafeEqual throws if not buffers
+  [📎[0m timingSafeEqual false if lengths differ
+  [📎[0m test\unit\crypto-utils.test.js
+
+[36mRunning:[0m test\unit\error-handler.test.js
+
+ЁЯЪС Testing Error Handler
+  [📎[0m returns provided user message
+  [📎[0m logger.error called once
+  [📎[0m log message propagated
+  [📎[0m context included in log payload
+  [📎[0m default user message returned
+  [📎[0m user message returned even for string input
+  [📎[0m string error captured in payload
+  [📎[0m test\unit\error-handler.test.js
+
+[36mRunning:[0m test\unit\fallback-chain.test.js
+  [📎[0m returns result from first provider if successful
+  [📎[0m falls back to next provider on error
+  [📎[0m tries all providers and throws if all fail
+  [📎[0m input passed to provider
+  [📎[0m opts passed to provider
+  [📎[0m passes input and opts to providers
+  [📎[0m provider was called
+  [📎[0m providerNames exposes correct names
+  [📎[0m test\unit\fallback-chain.test.js
+
+[36mRunning:[0m test\unit\file-lock.test.js
+
+ЁЯФТ Testing File Lock
+  Running: withFileLock acquires and releases lock
+  [📎[0m lock file created while executing
+  [📎[0m lock file removed after completion
+  [📎[0m data written while locked
+  Finished: withFileLock acquires and releases lock
+  Running: concurrent access waits for lock
+  [📎[0m both callbacks executed
+  [📎[0m second started after first released lock
+  Finished: concurrent access waits for lock
+  Running: stale lock is removed when older than timeout
+  [📎[0m stale lock removed and new lock released
+  [📎[0m data written after stale lock removal
+  Finished: stale lock is removed when older than timeout
+  Running: read/write/append helpers work with locks
+  [📎[0m append writes additional content
+  [📎[0m file removed via deleteFileLocked
+  Finished: read/write/append helpers work with locks
+  [📎[0m test\unit\file-lock.test.js
+
+[36mRunning:[0m test\unit\global-error-handling.test.js
+
+ЁЯФТ Testing Global Error Handling UX Flow
+  Running: User-Facing Safe Error Messages
+  [📎[0m Generic user message for unknown error
+  Running: Custom user message override
+  [📎[0m Custom user message override
+  Running: UserError message is safe to show
+  [📎[0m UserError message is safe to show
+  Running: Internal Logging with Redaction (Stack Trace)
+  [📎[0m Should have logged an error
+  [📎[0m Error message logged
+  [📎[0m Stack trace logged
+  Running: Internal Logging with Redaction (Sensitive Data)
+  [📎[0m Should contain error log
+  [📎[0m Safe context preserved
+  [📎[0m apiKey redacted
+  [📎[0m token redacted
+  [📎[0m password redacted
+  [📎[0m Nested secret redacted
+  [📎[0m Non-sensitive nested context preserved
+  [📎[0m test\unit\global-error-handling.test.js
+
+[36mRunning:[0m test\unit\history-store.test.js
+  [31mтЬЧ[0m test\unit\history-store.test.js
+
+[36mRunning:[0m test\unit\logger.test.js
+
+ЁЯзк Testing Logger
+  [📎[0m debug suppressed when level=warn
+  [📎[0m warn allowed when level=warn
+  [📎[0m error allowed when level=warn
+  [📎[0m file contains info message
+  [📎[0m file includes meta object
+  [📎[0m child format includes context key
+  [📎[0m child format keeps original message
+  [📎[0m format includes error message
+  [📎[0m format includes stack trace
+  [📎[0m info suppressed when level=error
+  [📎[0m console.log not called for suppressed level
+  [📎[0m test\unit\logger.test.js
+
+[36mRunning:[0m test\unit\macro-regression.test.js
+  [31mтЬЧ[0m test\unit\macro-regression.test.js
+
+[36mRunning:[0m test\unit\macro-store.test.js
+  [31mтЬЧ[0m test\unit\macro-store.test.js
+
+[36mRunning:[0m test\unit\memory-graph.test.js
+  [31mтЬЧ[0m test\unit\memory-graph.test.js
+
+[36mRunning:[0m test\unit\message-handler.test.js
+  [📎[0m /start command returns welcome message
+  [📎[0m /help command returns help text
+  [📎[0m /ask <question> returns AI answer
+  [📎[0m /ask with no question returns usage error
+  [📎[0m /ask returns error if AI service unavailable
+  [📎[0m /model returns model list and selection
+  [📎[0m /model <name> updates model
+  [📎[0m /model <invalid> returns error and valid options
+  [📎[0m /history returns conversation history
+  [📎[0m /history clear clears history and confirms
+  [📎[0m /settings returns current settings
+  [📎[0m /settings <key> <value> updates setting and confirms
+  [📎[0m /settings <invalid> returns error and valid options
+  [📎[0m /status returns status info
+  [📎[0m /version returns version info
+  [📎[0m /sh <command> as admin executes shell command and returns output
+  [📎[0m /sh <command> as non-admin returns admin error
+  [📎[0m unknown command returns friendly error and /help hint
+  [📎[0m malformed command returns error
+  [📎[0m exceeding rate limit returns warning and blocks further requests
+  [📎[0m error during command logs error and returns user-friendly message (no sensitive info)
+  [📎[0m should return recent conversation history for /history
+  [📎[0m should return empty array if no history exists
+  [📎[0m should return only last N messages if maxHistoryContext is set
+  [📎[0m should clear history and confirm on /history clear
+  [📎[0m should handle corrupted or missing history file gracefully
+  [📎[0m test\unit\message-handler.test.js
+
+[36mRunning:[0m test\unit\metrics.test.js
+  Running: records a successful metric sample
+  [📎[0m Provider entry should exist
+  [📎[0m Calls should be >= 1
+  [📎[0m Total latency should have increased
+  Running: records errors
+  [📎[0m Errors should be >= 1
+  [📎[0m test\unit\metrics.test.js
+
+[36mRunning:[0m test\unit\moderation.test.js
+  [31mтЬЧ[0m test\unit\moderation.test.js
+
+[36mRunning:[0m test\unit\notepad-store.test.js
+  [📎[0m Thoughts should be empty
+  [📎[0m Goals should be empty array
+  [📎[0m Planned actions should be empty array
+  [📎[0m Thoughts should match saved
+  [📎[0m Goals should match saved
+  [📎[0m Thoughts should be updated
+  [📎[0m Goals should remain same
+  [📎[0m Planned actions should remain same
+  [📎[0m Should load something before clear
+  [📎[0m Thoughts should be empty after clear
+  [📎[0m test\unit\notepad-store.test.js
+
+[36mRunning:[0m test\unit\ollama.test.js
+  [📎[0m should send a prompt and receive a response
+  [📎[0m should handle API errors gracefully
+  [📎[0m should handle invalid JSON response
+  [📎[0m should support model selection
+  [📎[0m test\unit\ollama.test.js
+
+[36mRunning:[0m test\unit\onboarding.test.js
+  [31mтЬЧ[0m test\unit\onboarding.test.js
+
+[36mRunning:[0m test\unit\openai.test.js
+  [📎[0m should send a prompt and receive a response
+  [📎[0m should handle API errors gracefully
+  [📎[0m should handle invalid JSON response
+  [📎[0m should support model selection
+  [📎[0m test\unit\openai.test.js
+
+[36mRunning:[0m test\unit\pinned-context-store.test.js
+  [31mтЬЧ[0m test\unit\pinned-context-store.test.js
+
+[36mRunning:[0m test\unit\plugin-regression.test.js
+  [31mтЬЧ[0m test\unit\plugin-regression.test.js
+
+[36mRunning:[0m test\unit\polling.test.js
+  [📎[0m updateHandler called for update
+  [📎[0m polled more than once
+  [📎[0m offset incremented
+  [📎[0m logger.error called on API error
+  [📎[0m logger.error called for updateHandler error
+ЁЯФД Starting Telegram polling...
+Polling for updates (offset: 0)
+No updates, waiting 10ms before next poll
+Polling for updates (offset: 0)
+No updates, waiting 10ms before next poll
+  [📎[0m no crash with default logger
+  [📎[0m test\unit\polling.test.js
+
+[36mRunning:[0m test\unit\proactive-agent.test.js
+  Running: should initialize correctly
+  [📎[0m should not be running initially
+  [📎[0m initial mood should be curious
+  Running: should start and schedule an action
+  [📎[0m agent should be running
+  [📎[0m should log start message
+  [📎[0m should schedule next action
+  Running: should stop and clear the timer
+  [📎[0m agent should not be running
+  [📎[0m timer should be cleared
+  [📎[0m should log stop message
+  Running: should change mood on trigger
+  [📎[0m Mood should have changed after multiple attempts
+  [📎[0m mood should be one of the available moods
+  Running: should generate a message based on mood
+  Running: should send a proactive message
+  Running: should not send message if adminChatId is not set
+  [📎[0m should not send any messages
+  [📎[0m should log warning
+  [📎[0m test\unit\proactive-agent.test.js
+
+[36mRunning:[0m test\unit\rate-limit-flow.test.js
+  [31mтЬЧ[0m test\unit\rate-limit-flow.test.js
+
+[36mRunning:[0m test\unit\rate-limiter.test.js
+
+тП│ Testing Rate Limiter
+  [📎[0m first request allowed
+  [📎[0m second request allowed
+  [📎[0m third request allowed
+  [📎[0m fourth request blocked by minute limit
+  [📎[0m warn() called when minute limit exceeded
+  [📎[0m hour request 1 allowed
+  [📎[0m hour request 2 allowed
+  [📎[0m hour request 3 allowed
+  [📎[0m hour request 4 allowed
+  [📎[0m hour request 5 allowed
+  [📎[0m sixth request blocked by hour limit
+  [📎[0m initial minute count is 0
+  [📎[0m initial hour count is 0
+  [📎[0m initial remaining minute = limit
+  [📎[0m initial remaining hour = limit
+  [📎[0m initial minutesUntilReset is 1
+  [📎[0m initial hoursUntilReset is 1
+  [📎[0m minute count increments
+  [📎[0m hour count increments
+  [📎[0m remaining minute decrements
+  [📎[0m remaining hour decrements
+  [📎[0m first allowed before reset
+  [📎[0m second allowed before reset
+  [📎[0m third blocked before reset
+  [📎[0m allowed after reset
+  [📎[0m status reflects fresh window after reset
+  [📎[0m tracks multiple users
+  [📎[0m no tracked users after resetAll
+  [📎[0m stale user initially tracked
+  [📎[0m stale user removed by cleanup
+  [📎[0m test\unit\rate-limiter.test.js
+
+[36mRunning:[0m test\unit\recovery-manager.test.js
+  [31mтЬЧ[0m test\unit\recovery-manager.test.js
+
+[36mRunning:[0m test\unit\reminder-scheduler.test.js
+  Running: should start and stop the scheduler
+  [📎[0m Scheduler should have intervalId set
+  [📎[0m Scheduler intervalId should be null after stop
+  Running: should not start if already running
+  [📎[0m Should warn when starting while already running
+  Running: should not stop if not running
+  [📎[0m Should warn when stopping while not running
+  Running: should check for and send due reminders
+  [📎[0m Should check due reminders
+  [📎[0m Expected 2, got 2
+  [📎[0m Assertion failed
+  [📎[0m Assertion failed
+  [📎[0m Expected 2, got 2
+  [📎[0m Assertion failed
+  [📎[0m Assertion failed
+  Running: should handle errors when sending a reminder
+  [📎[0m Assertion failed
+  [📎[0m Assertion failed
+  [📎[0m Should log error when reminder send fails
+  [📎[0m Assertion failed
+  Running: should handle errors when checking for reminders
+  [📎[0m Should log error when checking for due reminders fails
+  [📎[0m Assertion failed
+  [📎[0m Assertion failed
+  Running: should run periodically
+  [📎[0m Assertion failed
+  [📎[0m Assertion failed
+  [📎[0m test\unit\reminder-scheduler.test.js
+
+[36mRunning:[0m test\unit\reminder-store.test.js
+  Running: should add a reminder
+  [📎[0m Expected 1, got 1
+  [📎[0m Deep equality failed
+  Running: should get all reminders
+  [📎[0m Expected 2, got 2
+  Running: should return an empty array if no reminders file exists
+  [📎[0m Expected 0, got 0
+  Running: should get due reminders
+  [📎[0m Expected 1, got 1
+  [📎[0m Deep equality failed
+  Running: should remove a reminder
+  [📎[0m Expected 1, got 1
+  [📎[0m Expected true, got true
+  [📎[0m Expected 0, got 0
+  Running: should return false when trying to remove a non-existent reminder
+  [📎[0m Expected false, got false
+  [📎[0m test\unit\reminder-store.test.js
+
+[36mRunning:[0m test\unit\sandbox-runner-recovery.test.js
+  [31mтЬЧ[0m test\unit\sandbox-runner-recovery.test.js
+
+[36mRunning:[0m test\unit\sandbox-runner.test.js
+  [31mтЬЧ[0m test\unit\sandbox-runner.test.js
+
+[36mRunning:[0m test\unit\settings-store.test.js
+  Running: should initialize with default settings if none exist
+  [📎[0m Default theme should be light
+  [📎[0m Default verbosity should be normal
+  [📎[0m Default notifications should be all
+  Running: should persist and load settings for a user
+  [📎[0m Theme should persist as dark
+  [📎[0m Verbosity should persist as verbose
+  [📎[0m Notifications should persist as mentions
+  Running: should update a single setting and persist
+  [📎[0m Theme should update to light
+  [📎[0m Verbosity should update to minimal
+  Running: should throw if loading corrupt settings file
+  [📎[0m Should throw on corrupt settings file
+  Running: should reset to defaults
+  [📎[0m Theme should reset to light
+  [📎[0m Verbosity should reset to normal
+  [📎[0m Notifications should reset to all
+  [📎[0m test\unit\settings-store.test.js
+
+[36mRunning:[0m test\unit\summary-store.test.js
+  [31mтЬЧ[0m test\unit\summary-store.test.js
+
+[36mRunning:[0m test\acceptance\integration-e2e.test.js
+  [31mтЬЧ[0m test\acceptance\integration-e2e.test.js
+
+============================================================
+[36mTest Summary[0m
+============================================================
+Total:   54
+[32mPassed:  28[0m
+[31mFailed:  26[0m
+Duration: 12939ms
+============================================================
+
+[31mFailures:[0m
+
+1. [31mtest\unit\command-ask.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+2. [31mtest\unit\command-dashboard.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+3. [31mtest\unit\command-handler.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+4. [31mtest\unit\command-history.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+5. [31mtest\unit\command-macro.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+6. [31mtest\unit\command-marketplace.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+7. [31mtest\unit\command-model.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+8. [31mtest\unit\command-pin.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+9. [31mtest\unit\command-settings.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+10. [31mtest\unit\command-sh.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+11. [31mtest\unit\command-status-version.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+12. [31mtest\unit\command-wiki.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+13. [31mtest\unit\history-store.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+14. [31mtest\unit\macro-regression.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+15. [31mtest\unit\macro-store.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+16. [31mtest\unit\memory-graph.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+17. [31mtest\unit\moderation.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+18. [31mtest\unit\onboarding.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+19. [31mtest\unit\pinned-context-store.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+20. [31mtest\unit\plugin-regression.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+21. [31mtest\unit\rate-limit-flow.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+22. [31mtest\unit\recovery-manager.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+23. [31mtest\unit\sandbox-runner-recovery.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+24. [31mtest\unit\sandbox-runner.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+25. [31mtest\unit\summary-store.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+26. [31mtest\acceptance\integration-e2e.test.js[0m: Test file execution failed
+[90mError: Test process exited with code 1
+    at ChildProcess.<anonymous> (C:\Users\osmirnov\Documents\projects\govnobot\test\run-all.js:101:74)
+    at ChildProcess.emit (node:events:507:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)[0m
+
+[31mтЬЧ Tests failed[0m

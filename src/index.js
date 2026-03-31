@@ -140,8 +140,15 @@ async function initialize() {
     );
     logger.info('✅ Command handler initialized');
 
-    // Initialize and start reminder scheduler
-    const reminderScheduler = new ReminderScheduler(reminderStore, client, logger);
+    // Admin notifier for recovery events
+    const adminNotifier = (msg) => {
+      if (config.telegram.adminChatId && client) {
+        client.sendMessage(config.telegram.adminChatId, `[RecoveryManager] ${msg}`);
+      }
+    };
+
+    // Initialize and start reminder scheduler with recovery
+    const reminderScheduler = new ReminderScheduler(reminderStore, client, logger, adminNotifier);
     reminderScheduler.start();
     logger.info('✓ Reminder scheduler started');
 

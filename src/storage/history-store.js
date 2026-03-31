@@ -8,12 +8,13 @@ const fs = require('fs');
 const { writeFileLocked, readFileLocked, appendFileLocked, fileExists } = require('./file-lock');
 
 class HistoryStore {
-  constructor(dataDir = './data/history') {
+  constructor(dataDir = './data/history', ephemeralSession = null) {
     this.dataDir = dataDir;
-    
-    // Ensure directory exists
-    if (!fs.existsSync(this.dataDir)) {
-      fs.mkdirSync(this.dataDir, { recursive: true });
+    this.ephemeralSession = ephemeralSession; // If set, use in-memory only
+    if (!this.ephemeralSession) {
+      if (!fs.existsSync(this.dataDir)) {
+        fs.mkdirSync(this.dataDir, { recursive: true });
+      }
     }
   }
 
@@ -33,6 +34,13 @@ class HistoryStore {
    * @returns {Promise<Array>} - Array of message objects
    */
   async loadHistory(chatId, maxMessages = null) {
+    if (this.ephemeralSession) {
+      const messages = this.ephemeralSession.history || [];
+      if (maxMessages && messages.length > maxMessages) {
+        return messages.slice(-maxMessages);
+      }
+      return messages;
+    }
     const filePath = this.getHistoryPath(chatId);
     if (!fileExists(filePath)) {
       return [];
@@ -60,6 +68,10 @@ class HistoryStore {
    * @returns {Promise<void>}
    */
   async saveHistory(chatId, messages) {
+    if (this.ephemeralSession) {
+      this.ephemeralSession.history = messages;
+      return;
+    }
     const filePath = this.getHistoryPath(chatId);
     const content = JSON.stringify(messages, null, 2);
     await writeFileLocked(filePath, content);
@@ -102,6 +114,13 @@ class HistoryStore {
       content,
     };
     
+    // If running in ephemeral mode, keep history in-memory
+    if (this.ephemeralSession) {
+      if (!Array.isArray(this.ephemeralSession.history)) this.ephemeralSession.history = [];
+      this.ephemeralSession.history.push(message);
+      return;
+    }
+
     try {
       // Load existing history
       let messages = [];

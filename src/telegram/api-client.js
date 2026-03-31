@@ -9,6 +9,24 @@ const http = require('http');
 const { URL } = require('url');
 
 class TelegramAPIClient {
+    /**
+     * Send a document (file) to a chat
+     * @param {number|string} chatId - Telegram chat ID
+     * @param {string} document - File_id, HTTP URL, or base64 file (see Telegram API)
+     * @param {object} options - Additional options (caption, parse_mode, etc.)
+     * @returns {Promise<object>} - Response with sent message
+     */
+    async sendDocument(chatId, document, options = {}) {
+      if (!chatId || !document) {
+        throw new Error('chatId and document are required');
+      }
+      const params = {
+        chat_id: chatId,
+        document: document,
+        ...options,
+      };
+      return this.request('POST', 'sendDocument', params);
+    }
   constructor(botToken) {
     if (!botToken) {
       throw new Error('Bot token is required');
