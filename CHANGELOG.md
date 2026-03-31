@@ -14,6 +14,18 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
+## [1.10.6] - 2026-03-31 - Patch
+
+### ✅ Added - Wikipedia caching & rate limiting
+- Implemented an in-memory TTL cache for Wikipedia summary and section fetches to reduce duplicate requests and improve responsiveness.
+- Added a simple per-host token-bucket rate limiter to avoid excessive API calls and protect remote services.
+- Exposed runtime helpers: `configureWikipedia`, `clearWikipediaCache`, and `getWikipediaCacheStats` in `src/ai/wikipedia.js`.
+- Added unit tests `test/unit/wikipedia-cache-rate-limit.test.js` to validate caching and rate-limiter behavior.
+- Documentation updates: `README.md`, `govnodeploy.js`, and `govnodeploy.ps1` include deployment notes for configuring cache TTL and requests-per-minute.
+
+
+---
+
 
 ## [1.10.3] - 2026-03-20 - Patch
 

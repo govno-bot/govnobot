@@ -871,6 +871,15 @@ function Show-Help {
 "@ -ForegroundColor Cyan
 }
 
+# Deployment notes: Wikipedia cache & rate limiting
+# The Node.js runtime includes an in-memory Wikipedia cache and a token-bucket rate limiter.
+# Configure these by setting the following environment variables before starting the bot:
+#   $env:WIKI_CACHE_TTL_MS = '300000'   # cache TTL in milliseconds (default 300000)
+#   $env:WIKI_RPM = '60'                # requests per minute per host (default 60)
+# Example (PowerShell):
+#   $env:WIKI_CACHE_TTL_MS = '300000'; $env:WIKI_RPM = '60'; .\govnodeploy.ps1 start -BotToken '...'
+# When running under Task Scheduler, ensure these environment variables are set in the task action or global system/user environment so they are visible to the PowerShell process.
+
 # Main execution
 try {
     Write-Host ""

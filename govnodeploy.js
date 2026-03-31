@@ -30,6 +30,14 @@ function usage() {
   console.log('  node govnodeploy.js update --version 1.2.3');
   console.log('  node govnodeploy.js list');
   console.log('  node govnodeploy.js show');
+  console.log('');
+  console.log('Notes:');
+  console.log('  - The runtime supports configuring Wikipedia caching and rate limiting via environment variables:');
+  console.log('      WIKI_CACHE_TTL_MS (milliseconds), WIKI_RPM (requests per minute)');
+  console.log('  - Example (PowerShell):');
+  console.log('      $env:WIKI_CACHE_TTL_MS = "300000"; $env:WIKI_RPM = "60"; node src/index.js');
+  console.log('  - Example (bash):');
+  console.log('      WIKI_CACHE_TTL_MS=300000 WIKI_RPM=60 node src/index.js');
 }
 
 function readPackageVersion(projectRoot) {

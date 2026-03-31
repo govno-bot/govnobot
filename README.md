@@ -83,6 +83,35 @@ See [INDEX.md](INDEX.md) for complete overview and [TODO.md](TODO.md) for roadma
 .\govnodeploy.ps1 start -Instance govnobot -BotToken <YOUR_TOKEN>
 ```
 
+### Wikipedia Caching & Rate Limiting
+
+The Node.js Wikipedia client includes a small in-memory TTL cache and a per-host token-bucket rate limiter to reduce API calls and improve performance. Defaults:
+
+- Cache TTL: 5 minutes (300000 ms)
+- Rate limit: 60 requests per minute per Wikipedia host
+
+You can configure these at runtime in one of two ways:
+
+- Environment variables (recommended for deployment):
+	- `WIKI_CACHE_TTL_MS` — TTL in milliseconds (e.g. `300000`)
+	- `WIKI_RPM` — requests per minute (e.g. `60`)
+
+	Example (PowerShell):
+	```powershell
+	$env:WIKI_CACHE_TTL_MS = '300000'; $env:WIKI_RPM = '60'; node src/index.js
+	```
+
+	Example (Linux/macOS):
+	```bash
+	WIKI_CACHE_TTL_MS=300000 WIKI_RPM=60 node src/index.js
+	```
+
+- Programmatic configuration: call `configureWikipedia({ ttlMs, requestsPerMinute })` early in the startup path (e.g., in `src/index.js`) to set values from any configuration source.
+
+Notes:
+- The cache is in-memory and will be cleared on process restart. For clustered deployments, consider a shared cache layer.
+- When the rate limiter has no tokens, wiki fetch functions return `null` immediately — callers should handle this fallback gracefully.
+
 ### Checking Status
 
 ```powershell
