@@ -1,0 +1,12 @@
+[
+  {
+    "timestamp": "2026-04-01T14:39:09.147Z",
+    "role": "user",
+    "content": "hello world"
+  },
+  {
+    "timestamp": "2026-04-01T14:39:09.148Z",
+    "role": "assistant",
+    "content": "I am a bot response"
+  }
+]

@@ -1,0 +1,1 @@
+const fs=require('fs'); const s=fs.readFileSync('src/commands/command-handler.js','utf8'); const lines=s.split(/\r?\n/); const idx=21-1; const line=lines[idx]; console.log('line',idx+1, line); for(let i=0;i<line.length;i++){ console.log(i, line.charCodeAt(i), line[i]); }

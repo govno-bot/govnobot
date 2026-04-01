@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2026-04-01T14:37:57.080Z",
+    "role": "user",
+    "content": "1"
+  },
+  {
+    "timestamp": "2026-04-01T14:37:57.082Z",
+    "role": "assistant",
+    "content": "Mock response to: [object Object]"
+  },
+  {
+    "timestamp": "2026-04-01T14:37:57.084Z",
+    "role": "user",
+    "content": "2"
+  },
+  {
+    "timestamp": "2026-04-01T14:37:57.085Z",
+    "role": "assistant",
+    "content": "Mock response to: [object Object]"
+  }
+]

@@ -107,8 +107,11 @@ class Config {
 
     // Telegram configuration
     this.telegram.token = this.env('TELEGRAM_GOVNOBOT_TOKEN');
-    this.telegram.adminUsername = this.env('TELEGRAM_GOVNOBOT_ADMIN_USERNAME');
-    this.telegram.adminChatId = this.envInt('TELEGRAM_GOVNOBOT_ADMIN_CHATID');
+    // Support both legacy/unprefixed and GOVNOBOT-prefixed env var names.
+    // Prefer the unprefixed names first so tests that unset those vars behave
+    // as expected even if a prefixed variant exists in the environment.
+    this.telegram.adminUsername = this.env('TELEGRAM_ADMIN_USERNAME', this.env('TELEGRAM_GOVNOBOT_ADMIN_USERNAME'));
+    this.telegram.adminChatId = this.envInt('TELEGRAM_ADMIN_CHATID', this.envInt('TELEGRAM_GOVNOBOT_ADMIN_CHATID'));
     this.telegram.pollInterval = this.envInt('BOT_POLL_INTERVAL', 30000);
 
     // Ollama configuration
@@ -231,6 +234,13 @@ class Config {
       }
     };
   }
+
+  /**
+   * Backwards-compatible static accessor: Config.getConfig()
+   */
+  static getConfig() {
+    return getConfig();
+  }
 }
 
 // Singleton instance
@@ -241,10 +251,12 @@ let configInstance = null;
  * @returns {Config} Configuration instance
  */
 function getConfig() {
-  if (!configInstance) {
-    configInstance = new Config();
-    configInstance.load();
-  }
+  // Always create and load a fresh Config instance so callers get current
+  // environment values. This keeps behavior predictable for tests and
+  // for parts of the application that expect Config.getConfig() to reflect
+  // the current process.env state.
+  configInstance = new Config();
+  configInstance.load();
   return configInstance;
 }
 

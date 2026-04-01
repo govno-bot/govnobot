@@ -1,0 +1,1 @@
+const fs=require('fs'); const s=fs.readFileSync('src/commands/command-handler.js','utf8'); const lines=s.split(/\r?\n/); console.log(lines.slice(0,24).join('\n'));

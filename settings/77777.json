@@ -1,0 +1,8 @@
+{
+  "model": "mistral",
+  "systemPrompt": "You are a helpful assistant.",
+  "language": "en",
+  "theme": "light",
+  "verbosity": "normal",
+  "notifications": "all"
+}

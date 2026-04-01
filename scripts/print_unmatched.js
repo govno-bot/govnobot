@@ -1,0 +1,1 @@
+const fs=require('fs'); const s=fs.readFileSync('src/commands/command-handler.js','utf8'); const indices=[9585,27627,27642]; indices.forEach(idx=>{ const start=Math.max(0,idx-80); const end=Math.min(s.length, idx+80); console.log('--- idx',idx,'---'); console.log(s.slice(start,end)); });

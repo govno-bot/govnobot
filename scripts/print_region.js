@@ -1,0 +1,1 @@
+const fs=require('fs'); const s=fs.readFileSync('src/commands/command-handler.js','utf8'); const idx=9585; const start=Math.max(0,idx-120); const end=Math.min(s.length, idx+120); console.log('context>>>'); console.log(s.slice(start,end)); console.log('<<<context'); for(let i=start;i<end;i++){ process.stdout.write(i+':'+s.charCodeAt(i)+'\t'+ (s[i]) +'\n'); }

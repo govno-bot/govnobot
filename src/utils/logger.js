@@ -31,10 +31,9 @@ class Logger {
     this.file = options.file || false;
     this.filePath = options.filePath || './data/bot.log';
     this.format = options.format || 'text';
-    
     this.fileStream = null;
-    
-    // Open file stream if needed
+
+    // Prepare file path if needed (we will write synchronously)
     if (this.file && this.filePath) {
       this._openFileStream();
     }
@@ -51,9 +50,13 @@ class Logger {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      
-      // Open file in append mode
-      this.fileStream = fs.createWriteStream(this.filePath, { flags: 'a' });
+      // touch the file so it exists
+      try {
+        fs.appendFileSync(this.filePath, '');
+      } catch (e) {
+        // ignore
+      }
+      this.fileStream = true;
     } catch (error) {
       console.error('Failed to open log file:', error.message);
       this.file = false;
@@ -134,9 +137,14 @@ class Logger {
       consoleMethod(formatted);
     }
     
-    // File output
-    if (this.file && this.fileStream) {
-      this.fileStream.write(formatted + '\n');
+    // File output (synchronous to ensure tests can read immediately)
+    if (this.file && this.filePath) {
+      try {
+        fs.appendFileSync(this.filePath, formatted + '\n');
+      } catch (e) {
+        // If file write fails, fallback to console error
+        console.error('Logger file write failed:', e && e.message);
+      }
     }
   }
   
@@ -180,10 +188,8 @@ class Logger {
    * Close logger and file stream
    */
   close() {
-    if (this.fileStream) {
-      this.fileStream.end();
-      this.fileStream = null;
-    }
+    // No-op for synchronous writes; keep for API compatibility
+    this.fileStream = null;
   }
 }
 

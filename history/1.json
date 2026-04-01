@@ -1,0 +1,12 @@
+[
+  {
+    "timestamp": "2026-04-01T14:37:56.551Z",
+    "role": "user",
+    "content": "What is GovnoBot?"
+  },
+  {
+    "timestamp": "2026-04-01T14:37:56.555Z",
+    "role": "assistant",
+    "content": "Mock response to: [object Object]"
+  }
+]
