@@ -566,11 +566,45 @@ class CommandHandler {
         context.setAbortHandler(() => { aborted = true; });
       }
 
+      // Buffer tokens and update a single message (edit) to avoid sending
+      // one message per token (which can produce single-letter messages).
       const tokensBuffer = [];
-      const onToken = async (t) => {
+      let streamingUsed = false;
+      let streamingMessageId = null;
+      let editTimer = null;
+
+      const flushBuffer = async () => {
+        if (editTimer) {
+          clearTimeout(editTimer);
+          editTimer = null;
+        }
+        const text = tokensBuffer.join('');
+        if (!text) return;
+        try {
+          // If we haven't sent an initial message yet, send one and keep its id
+          if (!streamingMessageId) {
+            const resp = await this.client.sendMessage(chatId, text);
+            // telegram response shape: { ok: true, result: { message_id: ... } }
+            streamingMessageId = resp && resp.result && resp.result.message_id ? resp.result.message_id : null;
+          } else {
+            // Edit existing message with accumulated text
+            await this.client.editMessage(chatId, streamingMessageId, text);
+          }
+        } catch (e) {
+          if (this.logger && this.logger.error) this.logger.error('onToken send error', e);
+        }
+      };
+
+      const scheduleFlush = (delay = 150) => {
+        if (editTimer) return;
+        editTimer = setTimeout(() => flushBuffer().catch(() => {}), delay);
+      };
+
+      const onToken = (t) => {
+        streamingUsed = true;
         tokensBuffer.push(t);
-        // Send each token as a separate message (tests concatenate)
-        await this.client.sendMessage(chatId, String(t));
+        // Throttle edits to avoid spamming Telegram with too many edit requests
+        scheduleFlush(120);
       };
 
       const chain = this.fallbackChain || context.fallbackChain;
@@ -593,6 +627,17 @@ class CommandHandler {
         // Save user message
         await historyStore.addMessage(chatId, 'user', prompt);
 
+        // Ensure any pending edits are flushed
+        try {
+          if (editTimer) {
+            clearTimeout(editTimer);
+            editTimer = null;
+          }
+          await flushBuffer();
+        } catch (e) {
+          if (this.logger && this.logger.error) this.logger.error('flushBuffer error', e);
+        }
+
         // Determine final assistant text
         let assistantText = '';
         if (Array.isArray(tokensBuffer) && tokensBuffer.length > 0) {
@@ -601,11 +646,27 @@ class CommandHandler {
         if (!assistantText && typeof result === 'string') assistantText = result;
 
         if (assistantText) {
-          const chunks = typeof chunk === 'function' ? chunk(assistantText) : [assistantText];
-          for (const c of chunks) {
-            await this.client.sendMessage(chatId, c);
+          // If we streamed, we've already sent/edited a message containing the content.
+          // In that case, only persist to history and avoid sending a duplicate final message.
+          if (streamingUsed) {
+            // Ensure final edit reflects complete text
+            try {
+              if (streamingMessageId) {
+                await this.client.editMessage(chatId, streamingMessageId, assistantText);
+              } else {
+                await this.client.sendMessage(chatId, assistantText);
+              }
+            } catch (e) {
+              if (this.logger && this.logger.error) this.logger.error('final edit/send error', e);
+            }
+            await historyStore.addMessage(chatId, 'assistant', assistantText);
+          } else {
+            const chunks = typeof chunk === 'function' ? chunk(assistantText) : [assistantText];
+            for (const c of chunks) {
+              await this.client.sendMessage(chatId, c);
+            }
+            await historyStore.addMessage(chatId, 'assistant', assistantText);
           }
-          await historyStore.addMessage(chatId, 'assistant', assistantText);
         }
       } catch (err) {
         // ignore history save errors but log
