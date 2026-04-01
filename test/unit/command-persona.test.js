@@ -16,7 +16,7 @@ module.exports.run = async function(runner) {
       chatId: 1,
       args: [],
       telegramApiClient: fakeClient,
-      config: { dataDir: path.join(__dirname, '..', '..', 'data') },
+      config: { data: { dir: path.join(__dirname, '..', '..', 'data') } },
       logger: { error: () => {}, info: () => {} }
     };
 
@@ -35,7 +35,7 @@ module.exports.run = async function(runner) {
       chatId: 1,
       args: ['alien'],
       telegramApiClient: fakeClient,
-      config: { dataDir: path.join(__dirname, '..', '..', 'data') },
+      config: { data: { dir: path.join(__dirname, '..', '..', 'data') } },
       logger: { error: () => {}, info: () => {} }
     };
 
@@ -53,7 +53,7 @@ module.exports.run = async function(runner) {
       chatId: 12345,
       args: ['pirate'],
       telegramApiClient: fakeClient,
-      config: { dataDir: path.join(__dirname, '..', '..', 'data') },
+      config: { data: { dir: path.join(__dirname, '..', '..', 'data') } },
       logger: { error: () => {}, info: () => {} }
     };
 

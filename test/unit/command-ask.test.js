@@ -111,7 +111,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-        dataDir: TEST_DIR,
+        data: { dir: TEST_DIR },
         ai: { availableModels: ['gpt'] }, 
         telegram: {}, 
         security: {} 
@@ -144,7 +144,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-        dataDir: TEST_DIR,
+        data: { dir: TEST_DIR },
         ai: { availableModels: ['gpt'] }, 
         telegram: {}, 
         security: {} 
@@ -175,7 +175,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-        dataDir: TEST_DIR,
+        data: { dir: TEST_DIR },
         ai: { availableModels: ['gpt'] }, 
         telegram: {}, 
         security: {} 

@@ -1,0 +1,36 @@
+[Unit]
+Description=GovnoBot Node.js Telegram bot instance %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ensure this user has permission to read the bot directory and write data
+User=govnobot
+Group=govnobot
+
+# Adjust this to the location where the app is installed
+WorkingDirectory=/opt/govnobot/%i
+ExecStart=/usr/bin/node /opt/govnobot/%i/src/index.js
+
+# Optional environment file containing BOT config variables
+# e.g. TELEGRAM_GOVNOBOT_TOKEN=..., OLLAMA_URL=http://localhost:11434
+EnvironmentFile=-/etc/govnobot/%i.env
+
+# Fallback defaults (can be overridden by EnvironmentFile)
+Environment=NODE_ENV=production
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=govnobot-%i
+
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

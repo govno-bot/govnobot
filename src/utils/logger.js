@@ -1,178 +1,204 @@
 /**
- * Structured Logger
- * Handles console and file logging with different log levels
- * No external dependencies
+ * Logger Module - Structured Logging (Zero Dependencies)
+ * Supports multiple log levels, file and console output, JSON formatting
  */
 
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
+
+// Log levels (lower number = more severe)
+const LEVELS = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3
+};
 
 class Logger {
-  constructor(level = 'info', filePath = null) {
-    this.level = level;
-    this.filePath = filePath;
-    this.logLevels = {
-      debug: 0,
-      info: 1,
-      warn: 2,
-      error: 3,
-    };
+  /**
+   * Create a logger instance
+   * @param {Object} options - Configuration options
+   * @param {string} options.level - Minimum log level (debug, info, warn, error)
+   * @param {boolean} options.console - Log to console (default: true)
+   * @param {boolean} options.file - Log to file (default: false)
+   * @param {string} options.filePath - Path to log file
+   * @param {string} options.format - Log format: 'text' or 'json' (default: 'text')
+   */
+  constructor(options = {}) {
+    this.level = options.level || 'info';
+    this.console = options.console !== undefined ? options.console : true;
+    this.file = options.file || false;
+    this.filePath = options.filePath || './data/bot.log';
+    this.format = options.format || 'text';
     
-    // Ensure log file directory exists
-    if (this.filePath) {
-      const logDir = path.dirname(this.filePath);
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
+    this.fileStream = null;
+    
+    // Open file stream if needed
+    if (this.file && this.filePath) {
+      this._openFileStream();
     }
   }
-
+  
   /**
-   * Check if message should be logged based on level
+   * Open file stream for writing
+   * @private
    */
-  shouldLog(msgLevel) {
-    return this.logLevels[msgLevel] >= this.logLevels[this.level];
+  _openFileStream() {
+    try {
+      // Ensure directory exists
+      const dir = path.dirname(this.filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      
+      // Open file in append mode
+      this.fileStream = fs.createWriteStream(this.filePath, { flags: 'a' });
+    } catch (error) {
+      console.error('Failed to open log file:', error.message);
+      this.file = false;
+    }
   }
-
+  
   /**
-   * Format timestamp as ISO string
+   * Check if level should be logged
+   * @param {string} level - Log level to check
+   * @returns {boolean} True if should log
+   * @private
    */
-  getTimestamp() {
-    return new Date().toISOString();
+  _shouldLog(level) {
+    const currentLevel = LEVELS[this.level] || 1;
+    const messageLevel = LEVELS[level] || 1;
+    return messageLevel >= currentLevel;
   }
-
+  
   /**
    * Format log entry
+   * @param {string} level - Log level
+   * @param {string} message - Log message
+   * @param {Object} metadata - Additional data
+   * @returns {string} Formatted log entry
+   * @private
    */
-  format(level, message, meta = null) {
-    const timestamp = this.getTimestamp();
-    let entry = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+  _format(level, message, metadata) {
+    const timestamp = new Date().toISOString();
     
-    if (meta) {
-      if (meta instanceof Error) {
-        entry += `\n  Error: ${meta.message}\n  Stack: ${meta.stack}`;
-      } else if (typeof meta === 'object') {
-        entry += `\n  ${JSON.stringify(meta, null, 2)}`;
-      } else {
-        entry += `\n  ${meta}`;
-      }
+    if (this.format === 'json') {
+      const entry = {
+        timestamp,
+        level,
+        message,
+        ...metadata
+      };
+      return JSON.stringify(entry);
     }
     
-    return entry;
+    // Text format
+    let formatted = `${timestamp} [${level.toUpperCase()}] ${message}`;
+    
+    // Add metadata if present
+    if (metadata && Object.keys(metadata).length > 0) {
+      formatted += ' ' + JSON.stringify(metadata);
+    }
+    
+    return formatted;
   }
-
+  
   /**
-   * Get colored prefix for console output
+   * Write log entry
+   * @param {string} level - Log level
+   * @param {string} message - Log message
+   * @param {Object|Error} metadata - Additional data or Error object
+   * @private
    */
-  getColoredPrefix(level) {
-    const colors = {
-      debug: '\x1b[36m', // Cyan
-      info: '\x1b[32m',  // Green
-      warn: '\x1b[33m',  // Yellow
-      error: '\x1b[31m', // Red
-    };
+  _log(level, message, metadata = {}) {
+    if (!this._shouldLog(level)) {
+      return;
+    }
     
-    const reset = '\x1b[0m';
-    const emoji = {
-      debug: '🔍',
-      info: 'ℹ️',
-      warn: '⚠️',
-      error: '❌',
-    };
+    // Handle Error objects
+    if (metadata instanceof Error) {
+      metadata = {
+        error: metadata.message,
+        stack: metadata.stack
+      };
+    }
     
-    return `${colors[level]}${emoji[level]} ${level.toUpperCase()}${reset}`;
-  }
-
-  /**
-   * Write log entry to file
-   */
-  writeToFile(entry) {
-    if (!this.filePath) return;
+    const formatted = this._format(level, message, metadata);
     
-    try {
-      fs.appendFileSync(this.filePath, entry + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write to log file:', error.message);
+    // Console output
+    if (this.console) {
+      const consoleMethod = level === 'error' ? console.error : 
+                           level === 'warn' ? console.warn : 
+                           console.log;
+      consoleMethod(formatted);
+    }
+    
+    // File output
+    if (this.file && this.fileStream) {
+      this.fileStream.write(formatted + '\n');
     }
   }
-
+  
   /**
-   * Log at debug level
+   * Log debug message
+   * @param {string} message - Message to log
+   * @param {Object|Error} metadata - Additional data
    */
-  debug(message, meta = null) {
-    if (!this.shouldLog('debug')) return;
-    
-    const entry = this.format('debug', message, meta);
-    const prefix = this.getColoredPrefix('debug');
-    
-    console.log(`${prefix} ${message}`);
-    this.writeToFile(entry);
+  debug(message, metadata) {
+    this._log('debug', message, metadata);
   }
-
+  
   /**
-   * Log at info level
+   * Log info message
+   * @param {string} message - Message to log
+   * @param {Object|Error} metadata - Additional data
    */
-  info(message, meta = null) {
-    if (!this.shouldLog('info')) return;
-    
-    const entry = this.format('info', message, meta);
-    const prefix = this.getColoredPrefix('info');
-    
-    console.log(`${prefix} ${message}`);
-    this.writeToFile(entry);
+  info(message, metadata) {
+    this._log('info', message, metadata);
   }
-
+  
   /**
-   * Log at warn level
+   * Log warning message
+   * @param {string} message - Message to log
+   * @param {Object|Error} metadata - Additional data
    */
-  warn(message, meta = null) {
-    if (!this.shouldLog('warn')) return;
-    
-    const entry = this.format('warn', message, meta);
-    const prefix = this.getColoredPrefix('warn');
-    
-    console.warn(`${prefix} ${message}`);
-    this.writeToFile(entry);
+  warn(message, metadata) {
+    this._log('warn', message, metadata);
   }
-
+  
   /**
-   * Log at error level
+   * Log error message
+   * @param {string} message - Message to log
+   * @param {Object|Error} metadata - Additional data or Error object
    */
-  error(message, meta = null) {
-    if (!this.shouldLog('error')) return;
-    
-    const entry = this.format('error', message, meta);
-    const prefix = this.getColoredPrefix('error');
-    
-    console.error(`${prefix} ${message}`);
-    if (meta) {
-      if (meta instanceof Error) {
-        console.error(meta.stack);
-      } else {
-        console.error(JSON.stringify(meta, null, 2));
-      }
+  error(message, metadata) {
+    this._log('error', message, metadata);
+  }
+  
+  /**
+   * Close logger and file stream
+   */
+  close() {
+    if (this.fileStream) {
+      this.fileStream.end();
+      this.fileStream = null;
     }
-    this.writeToFile(entry);
-  }
-
-  /**
-   * Create a child logger with additional context
-   */
-  child(context) {
-    const childLogger = Object.create(this);
-    childLogger.context = context;
-    
-    // Override format to include context
-    const originalFormat = childLogger.format.bind(childLogger);
-    childLogger.format = (level, message, meta) => {
-      const contextStr = typeof context === 'object' 
-        ? JSON.stringify(context)
-        : context;
-      return originalFormat(level, `[${contextStr}] ${message}`, meta);
-    };
-    
-    return childLogger;
   }
 }
 
+/**
+ * Create a default logger instance (singleton)
+ */
+let defaultLogger = null;
+
+function getLogger(options) {
+  if (!defaultLogger) {
+    defaultLogger = new Logger(options);
+  }
+  return defaultLogger;
+}
+
 module.exports = Logger;
+module.exports.getLogger = getLogger;
+module.exports.LEVELS = LEVELS;

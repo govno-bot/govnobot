@@ -7,6 +7,9 @@ const path = require('path');
 const fs = require('fs');
 const { writeFileLocked, readFileLocked, appendFileLocked, fileExists } = require('./file-lock');
 
+const MAX_HISTORY_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const HISTORY_ARCHIVE_THRESHOLD_BYTES = 4.8 * 1024 * 1024; // rotate before hitting 5MB
+
 class HistoryStore {
   constructor(dataDir = './data/history', ephemeralSession = null) {
     this.dataDir = dataDir;
@@ -27,6 +30,42 @@ class HistoryStore {
     return path.join(this.dataDir, `${chatId}.json`);
   }
 
+  getArchivePath(chatId) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return path.join(this.dataDir, `${chatId}.${timestamp}.archive.json`);
+  }
+
+  async archiveHistory(chatId) {
+    const filePath = this.getHistoryPath(chatId);
+    if (!fileExists(filePath)) {
+      return null;
+    }
+
+    const archivePath = this.getArchivePath(chatId);
+    try {
+      fs.renameSync(filePath, archivePath);
+      return archivePath;
+    } catch (error) {
+      throw new Error(`Failed to archive history: ${error.message}`);
+    }
+  }
+
+  async ensureHistoryWithinLimit(chatId) {
+    const filePath = this.getHistoryPath(chatId);
+    if (!fileExists(filePath)) {
+      return;
+    }
+
+    try {
+      const stats = fs.statSync(filePath);
+      if (stats.size >= HISTORY_ARCHIVE_THRESHOLD_BYTES) {
+        await this.archiveHistory(chatId);
+      }
+    } catch (error) {
+      // If stat fails, do not prevent operations. The existing file may be in flux.
+    }
+  }
+
   /**
    * Load conversation history for a user
    * @param {number} chatId - Telegram chat ID
@@ -42,6 +81,8 @@ class HistoryStore {
       return messages;
     }
     const filePath = this.getHistoryPath(chatId);
+    await this.ensureHistoryWithinLimit(chatId);
+
     if (!fileExists(filePath)) {
       return [];
     }
@@ -122,6 +163,9 @@ class HistoryStore {
     }
 
     try {
+      // Rotate if file reached threshold before reading
+      await this.ensureHistoryWithinLimit(chatId);
+
       // Load existing history
       let messages = [];
       if (fileExists(filePath)) {

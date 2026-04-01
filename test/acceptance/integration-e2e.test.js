@@ -7,6 +7,7 @@
 const path = require('path');
 const assert = require('assert');
 const fs = require('fs');
+const { getConfig } = require('../../src/config');
 
 // Import bot entrypoint and helpers
 const bot = require(path.join(__dirname, '../../src/index.js'));
@@ -14,7 +15,6 @@ const TelegramAPIClient = require(path.join(__dirname, '../../src/telegram/api-c
 const CommandHandler = require(path.join(__dirname, '../../src/commands/command-handler.js'));
 const RateLimiter = require(path.join(__dirname, '../../src/security/rate-limiter.js'));
 const Logger = require(path.join(__dirname, '../../src/utils/logger.js'));
-const Config = require(path.join(__dirname, '../../src/config.js'));
 
 // Mocks
 class MockTelegramAPIClient {
@@ -33,7 +33,7 @@ class MockTelegramAPIClient {
 // Test runner entrypoint
 async function run(runner) {
   // Setup mock config, logger, client, rate limiter, command handler
-  const config = new Config();
+  const config = getConfig();
   const logger = new Logger('info');
   const client = new MockTelegramAPIClient();
   const rateLimiter = new RateLimiter(100, 1000, logger); // High limits for functional tests

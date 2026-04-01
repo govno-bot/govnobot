@@ -145,6 +145,207 @@ class CommandHandler {
         } catch (err) {
           await this.client.sendMessage(chatId, 'An error occurred processing your command');
         }
+<<<<<<< HEAD
+=======
+      };
+
+      // Create plugin-scoped registration helpers
+      const pluginApi = {
+        registerPublicCommand: (name, handler) => {
+          this.registerPublicCommandForPlugin(name, handler, pluginPath);
+          record.commands.public.add(name.toLowerCase());
+        },
+        registerAdminCommand: (name, handler) => {
+          this.registerAdminCommandForPlugin(name, handler, pluginPath);
+          record.commands.admin.add(name.toLowerCase());
+        },
+        config: this.config,
+        logger: this.logger,
+        client: this.client,
+        fallbackChain: this.fallbackChain
+      };
+
+      this.plugins.set(pluginPath, record);
+      pluginModule.init(pluginApi);
+      this.logger?.info(`Loaded plugin: ${pluginName}`);
+    } catch (err) {
+      this.logger?.error(`Error loading plugin ${pluginPath}`, err);
+    }
+  }
+
+  registerPublicCommandForPlugin(name, handler, pluginPath) {
+    this.registerPublicCommand(name, handler);
+  }
+
+  registerAdminCommandForPlugin(name, handler, pluginPath) {
+    this.registerAdminCommand(name, handler);
+  }
+
+  /**
+   * Register built-in commands
+   */
+  registerDefaultCommands() {
+    // Public commands
+    this.registerPublicCommand('start', this.handleStart.bind(this));
+    this.registerPublicCommand('help', this.handleHelp.bind(this));
+    this.registerPublicCommand('ask', this.handleAsk.bind(this));
+    this.registerPublicCommand('fix', this.handleFix.bind(this));
+    this.registerPublicCommand('model', this.handleModel.bind(this));
+    this.registerPublicCommand('settings', this.handleSettings.bind(this));
+    this.registerPublicCommand('history', this.handleHistory.bind(this));
+    this.registerPublicCommand('stats', this.handleStats.bind(this));
+    this.registerPublicCommand('status', this.handleStatus.bind(this));
+    this.registerPublicCommand('version', this.handleVersion.bind(this));
+
+    // Admin helper command: send message to Jack via local automation script
+    this.registerAdminCommand('jack', this.handleJackCommand.bind(this));
+
+    this.registerPublicCommand(remindCommand.name, remindCommand.handler);
+    this.registerPublicCommand(personaCommand.name, personaCommand.handler);
+    this.registerPublicCommand(gmCommand.name, gmCommand.handler);
+    this.registerPublicCommand(imagineCommand.name, imagineCommand.handler);
+
+    // Admin Commands
+    this.registerAdminCommand('sh', this.handleShellCommand.bind(this));        
+    this.registerAdminCommand('agent', this.handleAgentCommand.bind(this));     
+    this.registerAdminCommand('audit', this.handleAudit.bind(this));
+    this.registerAdminCommand(logsCommand.name, logsCommand.handler);
+  }
+
+  /**
+   * Get commands for the bot menu (setMyCommands)
+   * Returns array of {command, description} objects for public commands
+   */
+  getMenuCommands() {
+    const menuCommands = [
+      { command: 'start', description: 'Start the bot and get welcome message' },
+      { command: 'help', description: 'Show all available commands' },
+      { command: 'ask', description: 'Ask a question to AI' },
+      { command: 'fix', description: 'Get AI-powered fix suggestions' },
+      { command: 'model', description: 'View or change AI model' },
+      { command: 'settings', description: 'View or update your settings' },
+      { command: 'history', description: 'View your conversation history' },
+      { command: 'status', description: 'Show bot status and uptime' },
+      { command: 'version', description: 'Show bot version' },
+      { command: 'remind', description: 'Set a reminder' },
+      { command: 'persona', description: 'Set bot personality' },
+      { command: 'gm', description: 'Game Master mode for storytelling' },
+      { command: 'imagine', description: 'Generate images with AI' },
+    ];
+
+    // Only include commands that are actually registered
+    return menuCommands.filter(cmd => this.publicCommands.has(cmd.command.toLowerCase()));
+  }
+
+  /**
+   * Handle /fix command
+   */
+  async handleFix(context) {
+    const { chatId, args } = context;
+    if (args.length === 0) {
+      await this.client.sendMessage(chatId, '❌ Usage: /fix &lt;problem description&gt;');
+      return;
+    }
+    const problem = args.join(' ')
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    await this.client.sendChatAction(chatId, 'typing');
+    // Placeholder response
+    const response = `🛠️ Problem: "${problem}"
+\nAI-powered fix coming soon...`;
+    await this.client.sendMessage(chatId, response);
+  }
+
+  /**
+   * Handle /stats command
+   */
+  async handleStats(context) {
+    // For now, just call handleStatus
+    await this.handleStatus(context);
+  }
+
+  /**
+   * Handle /version command
+   */
+  async handleVersion(context) {
+    const { chatId } = context;
+    const message = `🤖 GovnoBot version: <b>${this.config.version}</b>`;
+    await this.client.sendMessage(chatId, message, { parse_mode: 'HTML' });
+  }
+  /**
+   * Register a public command
+   */
+  registerPublicCommand(name, handler) {
+    this.publicCommands.set(name.toLowerCase(), handler);
+  }
+
+  /**
+   * Register an admin command
+   */
+  registerAdminCommand(name, handler) {
+    this.adminCommands.set(name.toLowerCase(), handler);
+  }
+
+  /**
+   * Set bot info obtained from Telegram API
+   */
+  setBotInfo(botInfo) {
+    this.botInfo = botInfo;
+  }
+
+  /**
+   * Handle an incoming update
+   */
+  async handle(update) {
+    if (!update.message) {
+      return;
+    }
+
+    const message = update.message;
+    const chatId = message.chat.id;
+    const userId = message.from.id;
+    const username = message.from.username || 'unknown';
+    let text = message.text || '';
+
+    this.logger.debug(`Message from @${username}: ${text}`);
+
+    // Check rate limit
+    if (this.rateLimiter && !this.rateLimiter.isAllowed(chatId)) {
+      const status = this.rateLimiter.getStatus(chatId);
+      const isHourLimit = status.remainingHour === 0;
+      const waitTime = isHourLimit ? `${status.hoursUntilReset} hour(s)` : `${status.minutesUntilReset} minute(s)`;
+      
+      this.logger.warn(`Rate limit exceeded for chat ${chatId}`);
+      await this.client.sendMessage(
+        chatId,
+        `⚠️ <b>Rate limit exceeded.</b>\n\nYou are sending too many requests. Please wait ${waitTime} before trying again.`,
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    // Process Voice Messages
+    if (message.voice) {
+      this.logger.info(`Received voice message from user ${userId}`);
+      try {
+        await this.client.sendChatAction(chatId, 'typing');
+        const fileInfo = await this.client.getFile(message.voice.file_id);
+        const filePath = fileInfo.result.file_path;
+        const audioBuffer = await this.client.downloadFile(filePath);
+        const filename = path.basename(filePath) || 'voice.ogg';
+        
+        text = await this.fallbackChain.transcribeAudio(audioBuffer, filename);
+        if (!text || text.trim().length === 0) {
+          throw new Error('Transcription resulted in empty text');
+        }
+        
+        // Let the user know we transcribed it
+        await this.client.sendMessage(chatId, `🎤 <i>Transcript:</i> ${text}`, { parse_mode: 'HTML' });
+      } catch (err) {
+        this.logger.error(`Voice transcription failed: ${err.message}`);
+        await this.client.sendMessage(chatId, `⚠️ Failed to transcribe voice message. Please send text instead.`);
+>>>>>>> 069fad8534b0c8182f6c294422e1eba3cbbe2cc7
         return;
       }
 
@@ -556,6 +757,7 @@ class CommandHandler {
     const args = context.args || context.args || (context.message && context.message.text && context.message.text.split(' ').slice(1)) || [];
     const prompt = Array.isArray(args) ? args.join(' ') : (args || '');
 
+<<<<<<< HEAD
     try {
       // Support streaming responses via onToken/isAborted
       let aborted = false;
@@ -569,6 +771,158 @@ class CommandHandler {
         tokensBuffer.push(t);
         // Send each token as a separate message (tests concatenate)
         await this.client.sendMessage(chatId, String(t));
+=======
+    if (args.length === 0) {
+      if (isInlineMention) {
+        await this.client.sendMessage(chatId, '🤖 Hi! How can I help you?');
+      } else {
+        await this.client.sendMessage(chatId, '❌ Usage: /ask &lt;your question&gt;');
+      }
+      return;
+    }
+
+    const question = args.join(' ');    // Show typing indicator
+    await this.client.sendChatAction(chatId, 'typing');
+    
+    // Load user settings (for model, system prompt, and language)
+    const settingsDir = path.join(this.config.data.dir, 'settings');
+    let settings = { model: this.config.ai.defaultModel, systemPrompt: 'You are a helpful assistant.', language: 'en' };
+    try {
+      const store = new SettingsStore(chatId, settingsDir);
+      settings = await store.load();
+    } catch (err) {
+      this.logger.error(`Error loading settings for user ${chatId} during /ask`, err);
+    }
+    
+    // Save user message to history
+    const historyDir = path.join(this.config.data.dir, 'history');
+    const historyStore = new HistoryStore(historyDir);
+    
+    try {
+      await historyStore.addMessage(chatId, 'user', question);
+    } catch (err) {
+      this.logger.error(`Error saving user message to history for ${chatId}`, err);
+    }
+    
+    try {
+      if (!this.fallbackChain) {
+        throw new Error('AI service not configured');
+      }
+
+      // Build prompt with optional system prompt and language preference
+      const language = (settings.language || 'en').toLowerCase();
+      const messages = [];
+      if (settings.systemPrompt) {
+        messages.push({ role: 'system', content: settings.systemPrompt });
+      }
+      let userPrompt = question;
+      if (language && language !== 'en') {
+        userPrompt = `Please answer the following question in ${language}:\n\n${question}`;
+      }
+      messages.push({ role: 'user', content: userPrompt });
+
+      // Call AI service using the user's preferred model
+      const answer = await this.fallbackChain.call(messages, { model: settings.model });
+      
+      // Save assistant message to history
+      try {
+        await historyStore.addMessage(chatId, 'assistant', answer);
+      } catch (err) {
+        this.logger.error(`Error saving assistant message to history for ${chatId}`, err);
+      }
+      
+      // Split long messages
+      const chunks = chunk(answer);
+      
+      for (const msgChunk of chunks) {
+        await this.client.sendMessage(chatId, msgChunk);
+      }
+      
+    } catch (error) {
+      this.logger.error('Error handling /ask', error);
+      await this.client.sendMessage(
+        chatId,
+        'sorry, I encountered an error getting an answer. Please try again later.'
+      );
+    }
+  }
+
+  /**
+   * Handle /model command
+   */
+  async handleModel(context) {
+    const { chatId, args } = context;
+    const settingsDir = path.join(this.config.data.dir, 'settings');
+    let settings;
+    try {
+      const store = new SettingsStore(chatId, settingsDir);
+      settings = await store.load();
+    } catch (err) {
+      this.logger.error(`Error loading settings for user ${chatId}`, err);
+      settings = { model: this.config.ai.defaultModel };
+    }
+    
+    // Fetch available models dynamically (array of objects)
+    const availableModels = await this.getAvailableModels();
+    
+    if (args.length === 0) {
+      const models = availableModels.map(m => `${m.id} — ${m.provider} (${m.source})`).join('\n');
+      const message = `
+<b>Available AI Models:</b>
+${models}
+
+<b>Current model:</b> ${settings.model || this.config.ai.defaultModel}
+
+Use: /model &lt;model_name&gt;
+      `.trim();
+      await this.client.sendMessage(chatId, message, { parse_mode: 'HTML' });
+      return;
+    }
+    
+    const selectedModel = args[0].toLowerCase()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    
+    // Normalize available model ids for matching
+    const normalizedIds = availableModels.map(m => String(m.id).toLowerCase());
+    if (!normalizedIds.includes(selectedModel)) {
+      await this.client.sendMessage(
+        chatId,
+        `❌ Invalid model: ${selectedModel}\n\nAvailable models: ${availableModels.map(m => m.id).join(', ')}`
+      );
+      return;
+    }
+    
+    try {
+      const store = new SettingsStore(chatId, settingsDir);
+      await store.update('model', selectedModel);
+      await this.client.sendMessage(chatId, `✓ Model switched to: ${selectedModel}`);
+    } catch (err) {
+      this.logger.error(`Error saving model setting for user ${chatId}`, err);
+      await this.client.sendMessage(chatId, '❌ Failed to update model setting.');
+    }
+  }
+
+  /**
+   * Handle /settings command
+   */
+  async handleSettings(context) {
+    const { chatId, args } = context;
+    const settingsDir = path.join(this.config.data.dir, 'settings');
+    let settings;
+
+    // Load settings
+    try {
+      const store = new SettingsStore(chatId, settingsDir);
+      settings = await store.load();
+    } catch (err) {
+      this.logger.error(`Error loading settings for user ${chatId}`, err);
+      settings = { 
+        model: this.config.ai.defaultModel,
+        systemPrompt: 'You are a helpful assistant.',
+        language: 'en'
+>>>>>>> 069fad8534b0c8182f6c294422e1eba3cbbe2cc7
       };
 
       const chain = this.fallbackChain || context.fallbackChain;
@@ -581,7 +935,22 @@ class CommandHandler {
       const inputForChain = [{ role: 'user', content: prompt }];
       const result = await chain.call(inputForChain, { onToken, isAborted });
 
+<<<<<<< HEAD
       // Persist to history: save user prompt and assistant response
+=======
+  /**
+   * Handle /history command
+   */
+  async handleHistory(context) {
+    const { chatId, args } = context;
+    
+    // Initialize store
+    const historyDir = path.join(this.config.data.dir, 'history');
+    const store = new HistoryStore(historyDir);
+    
+    // Subcommand: clear
+    if (args.length > 0 && args[0].toLowerCase() === 'clear') {
+>>>>>>> 069fad8534b0c8182f6c294422e1eba3cbbe2cc7
       try {
         const historyDir = path.join(this.config.dataDir || '.', 'history');
         const historyStore = new HistoryStore(historyDir, this.ephemeralSessions[chatId]);

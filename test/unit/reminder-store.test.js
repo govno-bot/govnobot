@@ -2,9 +2,10 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const ReminderStore = require('../../src/storage/reminder-store');
-const { DATA_DIR } = require('../../src/config');
+const { getConfig } = require('../../src/config');
 // file-lock module exports helper functions; lock path is filePath + '.lock'
-
+const config = getConfig();
+const DATA_DIR = config.data.dir;
 const TEST_REMINDERS_PATH = path.join(DATA_DIR, 'reminders.json');
 
 const mockLogger = {

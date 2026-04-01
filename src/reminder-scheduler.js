@@ -51,8 +51,14 @@ class ReminderScheduler {
                     this.logger.info(`Sent reminder ${reminder.id} to chat ${reminder.chatId}`);
                     this.recovery.recordSuccess(reminder.id);
                 } catch (error) {
+<<<<<<< HEAD
                     this.logger.error(`Failed to send reminder ${reminder.id} or remove it:`, error);
                     this.recovery.recordFailure(reminder.id, error);
+=======
+                    this.logger.error(`ChatId: ${reminder.chatId} - Failed to send reminder ${reminder.id} or remove it:`, error);
+                    // Decide on a retry strategy or if the reminder should be kept or removed.
+                    // For now, we'll leave it and it will be picked up again.
+>>>>>>> 069fad8534b0c8182f6c294422e1eba3cbbe2cc7
                 }
             }
         } catch (error) {

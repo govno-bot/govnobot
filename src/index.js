@@ -18,6 +18,7 @@ const CommandHandler = require('./commands/command-handler');
 const RateLimiter = require('./security/rate-limiter');
 const AuditLogger = require('./security/audit-logger');
 const FallbackChain = require('./ai/fallback-chain');
+const NanoBanana2Client = require('./ai/nano-banana-2');
 const OllamaClient = require('./ai/ollama');
 const OpenAIClient = require('./ai/openai');
 const ReminderStore = require('./storage/reminder-store');
@@ -38,13 +39,13 @@ let commandHandler;
 async function initialize() {
   try {
     // Load configuration
-    config = new Config();
+    config = Config.getConfig();
     
     // Initialize logger
     logger = new Logger(config.logging.level, config.logging.file);
     logger.info('🚀 GovnoBot Node.js starting...');
     logger.info(`Version: ${config.version}`);
-    logger.info(`Data directory: ${config.dataDir}`);
+    logger.info(`Data directory: ${config.data.dir}`);
     
     // Validate required configuration
     if (!config.telegram.token) {
@@ -80,7 +81,10 @@ async function initialize() {
     // or respect the array order if we want to be fancy.
     // Let's implement dynamic provider selection based on config.ai.fallbackOrder.
     
+    const nanoBanana2 = new NanoBanana2Client({ model: 'nano-banana-2' });
+
     const providerMap = {
+      'nano-banana-2': nanoBanana2,
       'ollama': ollama,
       'openai': openai
     };
@@ -124,7 +128,7 @@ async function initialize() {
     logger.info('✅ Reminder store initialized');
 
     // Initialize notepad store
-    const notepadStore = new NotepadStore(config.dataDir);
+    const notepadStore = new NotepadStore(config.data.dir);
     logger.info('✅ Notepad store initialized');
 
     // Initialize command handler
@@ -198,10 +202,10 @@ async function initialize() {
  */
 function ensureDataDirectories() {
   const dirs = [
-    config.dataDir,
-    path.join(config.dataDir, 'history'),
-    path.join(config.dataDir, 'settings'),
-    path.join(config.dataDir, 'backups'),
+    config.data.dir,
+    path.join(config.data.dir, 'history'),
+    path.join(config.data.dir, 'settings'),
+    path.join(config.data.dir, 'backups'),
   ];
   
   dirs.forEach(dir => {
@@ -273,6 +277,15 @@ async function start() {
       }
     } catch (err) {
       logger.warn('Could not fetch bot info from Telegram API', err);
+    }
+
+    // Set bot commands menu
+    try {
+      const menuCommands = commandHandler.getMenuCommands();
+      await client.setMyCommands(menuCommands);
+      logger.info(`✅ Set ${menuCommands.length} commands in bot menu`);
+    } catch (err) {
+      logger.warn('Could not set bot commands menu', err);
     }
 
     logger.info('🔄 Starting polling loop...');

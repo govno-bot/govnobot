@@ -5,7 +5,7 @@ const gmCommand = {
   name: 'gm',
   handler: async (context) => {
     const { chatId, args, telegramApiClient, config, fallbackChain, logger } = context;
-    const campaignDir = path.join(config.dataDir, 'campaigns');
+    const campaignDir = path.join(config.data.dir, 'campaigns');
     let store;
     try {
       store = new CampaignStore(chatId, campaignDir);

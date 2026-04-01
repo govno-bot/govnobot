@@ -13,7 +13,7 @@ const personaCommand = {
   name: 'persona',
   handler: async (context) => {
     const { chatId, args, telegramApiClient, config, logger } = context;
-    const settingsDir = path.join(config.dataDir, 'settings');
+    const settingsDir = path.join(config.data.dir, 'settings');
     let store;
     try {
       store = new SettingsStore(chatId, settingsDir);

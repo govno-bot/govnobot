@@ -33,9 +33,9 @@ module.exports.run = async function(runner) {
       sendChatAction: async () => {} 
     };
 
-    const config = new Config();
+    const config = Config.getConfig();
     // Override manually
-    config.dataDir = testDataDir;
+    config.data = { dir: testDataDir };
     config.ai = {
         availableModels: ['deepseek-r1:8b', 'mistral', 'gpt-4'],
         defaultModel: 'deepseek-r1:8b',
