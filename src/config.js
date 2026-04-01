@@ -1,7 +1,7 @@
 /**
- * Configuration management
- * Loads and validates environment variables
- * No external dependencies - uses native Node.js
+ * Configuration Management
+ * Loads configuration from environment variables and .env file
+ * No external dependencies (no dotenv package)
  */
 
 const fs = require('fs');
@@ -9,216 +9,246 @@ const path = require('path');
 
 class Config {
   constructor() {
-    this.projectRoot = path.dirname(__dirname); // Correctly sets project root from src/
-
-    // Derive version from environment override or package.json so it's not hardcoded
-    try {
-      const envVer = process.env.BOT_VERSION;
-      const pkgPath = path.join(this.projectRoot, 'package.json');
-      if (envVer) {
-        this.version = envVer;
-      } else if (fs.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        this.version = (pkg && pkg.version) ? String(pkg.version) : '0.0.0';
-      } else {
-        this.version = '0.0.0';
-      }
-    } catch (e) {
-      this.version = process.env.BOT_VERSION || '0.0.0';
-    }
-    this.dataDir = process.env.BOT_DATA_DIR || path.join(this.projectRoot, 'data');
-    this.load();
+    this.loaded = false;
+    this.telegram = {};
+    this.ollama = {};
+    this.openai = {};
+    this.bot = {};
+    this.data = {};
+    this.logging = {};
+    this.security = {};
   }
 
   /**
-   * Load configuration from environment variables and .env file
-   */
-  load() {
-    // Load from .env file if it exists
-    this.loadEnvFile();
-    
-    // Parse and validate configuration
-    this.telegram = this.parseTelegramConfig();
-    this.ai = this.parseAIConfig();
-    this.rateLimit = this.parseRateLimitConfig();
-    this.logging = this.parseLoggingConfig();
-    this.profiling = this.parseProfilingConfig();
-    this.security = this.parseSecurityConfig();
-    this.dataDir = process.env.BOT_DATA_DIR || path.join(this.projectRoot, 'data');
-    this.backupRetention = parseInt(process.env.BOT_BACKUP_RETENTION || '10', 10);
-    
-    this.validateRequiredFields();
-  }
-
-  /**
-   * Load environment variables from .env file
+   * Load configuration from .env file if it exists
    */
   loadEnvFile() {
-    const envPath = path.join(this.projectRoot, '.env');
+    const envPath = path.join(process.cwd(), '.env');
     
-    if (fs.existsSync(envPath)) {
+    if (!fs.existsSync(envPath)) {
+      return; // .env is optional
+    }
+
+    try {
       const envContent = fs.readFileSync(envPath, 'utf8');
-      
-      envContent.split('\n').forEach(line => {
-        line = line.trim();
-        
-        // Skip empty lines and comments
-        if (!line || line.startsWith('#')) {
-          return;
+      const lines = envContent.split('\n');
+
+      for (const line of lines) {
+        // Skip comments and empty lines
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) {
+          continue;
         }
-        
-        const separatorIndex = line.indexOf('=');
-        if (separatorIndex === -1) {
-          return;
+
+        // Parse KEY=VALUE
+        const equalsIndex = trimmed.indexOf('=');
+        if (equalsIndex === -1) {
+          continue;
         }
-        
-        const key = line.substring(0, separatorIndex).trim();
-        const value = line.substring(separatorIndex + 1).trim();
-        
-        // Remove quotes if present
-        const unquotedValue = value.replace(/^["']|["']$/g, '');
-        
+
+        const key = trimmed.substring(0, equalsIndex).trim();
+        const value = trimmed.substring(equalsIndex + 1).trim();
+
         // Only set if not already in environment
         if (!process.env[key]) {
-          process.env[key] = unquotedValue;
+          process.env[key] = value;
         }
-      });
+      }
+    } catch (error) {
+      console.warn('Warning: Could not read .env file:', error.message);
     }
   }
 
   /**
-   * Parse Telegram-related configuration
+   * Get environment variable with default value
    */
-  parseTelegramConfig() {
-    return {
-      token: process.env.TELEGRAM_GOVNOBOT_TOKEN || '',
-      adminUsername: process.env.TELEGRAM_ADMIN_USERNAME || '',
-      adminChatId: parseInt(process.env.TELEGRAM_GOVNOBOT_ADMIN_CHATID || '0', 10),
-      pollInterval: parseInt(process.env.BOT_POLL_INTERVAL || '30000', 10),
-      messageChunkSize: parseInt(process.env.BOT_MESSAGE_CHUNK_SIZE || '4096', 10),
-    };
+  env(key, defaultValue = '') {
+    return process.env[key] || defaultValue;
   }
 
   /**
-   * Parse AI service configuration
+   * Get environment variable as integer
    */
-  parseAIConfig() {
-    const defaultModels = ['deepseek-r1:8b', 'mistral', 'gpt-4', 'gpt-3.5-turbo'];
-    const availableModels = (process.env.AVAILABLE_MODELS || defaultModels.join(','))
-      .split(',')
-      .map(m => m.trim())
-      .filter(Boolean);
-    
-    const fallbackOrder = (process.env.AI_FALLBACK_ORDER || 'ollama,openai')
-      .split(',')
-      .map(p => p.trim())
-      .filter(Boolean);
-
-    return {
-      defaultModel: process.env.OLLAMA_MODEL || 'deepseek-r1:8b',
-      availableModels: availableModels,
-      ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
-      openaiApiKey: process.env.OPENAI_API_KEY || '',
-      openaiModel: process.env.OPENAI_MODEL || 'gpt-4',
-      fallbackOrder: fallbackOrder, 
-    };
+  envInt(key, defaultValue = 0) {
+    const value = process.env[key];
+    if (!value) return defaultValue;
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? defaultValue : parsed;
   }
 
   /**
-   * Parse rate limiting configuration
+   * Get environment variable as boolean
    */
-  parseRateLimitConfig() {
-    return {
-      requestsPerMinute: parseInt(process.env.BOT_RATE_LIMIT_REQUESTS_PER_MIN || '10', 10),
-      requestsPerHour: parseInt(process.env.BOT_RATE_LIMIT_REQUESTS_PER_HOUR || '100', 10),
-      enabled: process.env.BOT_RATE_LIMIT_ENABLED !== 'false',
-    };
+  envBool(key, defaultValue = false) {
+    const value = process.env[key];
+    if (!value) return defaultValue;
+    return value.toLowerCase() === 'true' || value === '1';
   }
 
   /**
-   * Parse logging configuration
+   * Get environment variable as array (comma-separated)
    */
-  parseLoggingConfig() {
-    return {
-      level: process.env.BOT_LOG_LEVEL || 'info', // debug, info, warn, error
-      file: process.env.BOT_LOG_FILE || path.join(this.projectRoot, 'data', 'bot.log'),
-      console: process.env.BOT_LOG_CONSOLE !== 'false',
-    };
+  envArray(key, defaultValue = []) {
+    const value = process.env[key];
+    if (!value) return defaultValue;
+    return value.split(',').map(item => item.trim()).filter(item => item);
   }
 
   /**
-   * Parse profiling configuration for long-running loops and diagnostics
+   * Load and validate configuration
    */
-  parseProfilingConfig() {
-    return {
-      // If true, AgenticLoop will log memory/cpu stats each iteration.
-      agenticLoopEnabled: process.env.BOT_AGENTIC_LOOP_PROFILING === 'true',
+  load() {
+    if (this.loaded) {
+      return this;
+    }
+
+    // Load .env file first
+    this.loadEnvFile();
+
+    // Telegram configuration
+    this.telegram.token = this.env('TELEGRAM_GOVNOBOT_TOKEN');
+    this.telegram.adminUsername = this.env('TELEGRAM_GOVNOBOT_ADMIN_USERNAME');
+    this.telegram.adminChatId = this.envInt('TELEGRAM_GOVNOBOT_ADMIN_CHATID');
+    this.telegram.pollInterval = this.envInt('BOT_POLL_INTERVAL', 30000);
+
+    // Ollama configuration
+    this.ollama.url = this.env('OLLAMA_URL', 'http://localhost:11434');
+    this.ollama.model = this.env('OLLAMA_MODEL', 'deepseek-r1:8b');
+    this.ollama.availableModels = this.envArray('AVAILABLE_MODELS', [
+      'deepseek-r1:8b', 'mistral', 'neural-chat', 'dolphin-mixtral'
+    ]);
+
+    // OpenAI configuration (optional fallback)
+    this.openai.apiKey = this.env('OPENAI_API_KEY');
+
+    // Bot configuration
+    this.bot.pollInterval = this.telegram.pollInterval;
+    this.bot.messageChunkSize = this.envInt('BOT_MESSAGE_CHUNK_SIZE', 4096);
+    this.bot.rateLimitPerMin = this.envInt('BOT_RATE_LIMIT_REQUESTS_PER_MIN', 10);
+    this.bot.rateLimitPerHour = this.envInt('BOT_RATE_LIMIT_REQUESTS_PER_HOUR', 100);
+
+    // Data storage
+    this.data.dir = this.env('BOT_DATA_DIR', './data');
+    this.data.historyDir = path.join(this.data.dir, 'history');
+    this.data.settingsDir = path.join(this.data.dir, 'settings');
+    this.data.backupsDir = path.join(this.data.dir, 'backups');
+    this.data.backupRetention = this.envInt('BOT_BACKUP_RETENTION', 10);
+
+    // Logging
+    this.logging.level = this.env('BOT_LOG_LEVEL', 'info');
+    this.logging.file = this.env('BOT_LOG_FILE', path.join(this.data.dir, 'bot.log'));
+
+    // Security
+    this.security.adminIpWhitelist = this.envArray('ADMIN_IP_WHITELIST', ['127.0.0.1', '::1']);
+    this.security.shCommandWhitelist = this.envArray('SH_COMMAND_WHITELIST', [
+      'ls', 'ps', 'whoami', 'date', 'pwd'
+    ]);
+    this.security.auditLogPath = path.join(this.data.dir, 'audit.log');
+    this.security.auditLogFile = this.env('AUDIT_LOG_FILE', this.security.auditLogPath);
+    this.security.auditLogSecret = this.env('AUDIT_LOG_SECRET', 'default-insecure-secret-please-change');
+
+    this.ai = {};
+    this.ai.availableModels = this.ollama.availableModels;
+    this.ai.defaultModel = this.ollama.model;
+    this.ai.fallbackOrder = this.envArray('AI_FALLBACK_ORDER', ['nano-banana-2', 'ollama', 'openai']);
+
+    this.rateLimit = {
+      requestsPerMin: this.bot.rateLimitPerMin,
+      requestsPerHour: this.bot.rateLimitPerHour
     };
+
+      const pkg = require('../package.json');
+      const version = pkg.version || 'unknown';
+
+    this.version = version;
+
+    this.loaded = true;
+    console.dir(this);
+    return this;
   }
 
   /**
-   * Parse security configuration
+   * Validate required configuration
+   * @throws {Error} if required configuration is missing
    */
-  parseSecurityConfig() {
-    const ipWhitelist = (process.env.ADMIN_IP_WHITELIST || '')
-      .split(',')
-      .map(ip => ip.trim())
-      .filter(Boolean);
-    
-    const shCommandWhitelist = (process.env.SH_COMMAND_WHITELIST || '')
-      .split(',')
-      .map(cmd => cmd.trim())
-      .filter(Boolean);
-    
-    return {
-      ipWhitelist: ipWhitelist,
-      shCommandWhitelist: shCommandWhitelist,
-      requireIpWhitelist: process.env.ADMIN_IP_WHITELIST_REQUIRED !== 'false',
-      auditLogSecret: process.env.AUDIT_LOG_SECRET || 'default-insecure-secret-please-change',
-      auditLogFile: process.env.AUDIT_LOG_FILE || path.join(this.projectRoot, 'data', 'audit.log'),
-    };
-  }
-
-  /**
-   * Validate that all required fields are present
-   */
-  validateRequiredFields() {
+  validate() {
     const errors = [];
-    
+
     if (!this.telegram.token) {
-      errors.push('TELEGRAM_GOVNOBOT_TOKEN environment variable is required');
+      errors.push('TELEGRAM_GOVNOBOT_TOKEN is required');
     }
-    
+
+    if (this.telegram.token && this.telegram.token === 'your_bot_token_here') {
+      errors.push('TELEGRAM_GOVNOBOT_TOKEN must be configured (not placeholder)');
+    }
+
     if (!this.telegram.adminUsername && !this.telegram.adminChatId) {
-      errors.push('Either TELEGRAM_ADMIN_USERNAME or TELEGRAM_ADMIN_CHATID must be set');
+      errors.push('At least one of TELEGRAM_ADMIN_USERNAME or TELEGRAM_ADMIN_CHATID is required');
     }
-    
+
+    if (this.bot.messageChunkSize < 100 || this.bot.messageChunkSize > 4096) {
+      errors.push('BOT_MESSAGE_CHUNK_SIZE must be between 100 and 4096');
+    }
+
     if (errors.length > 0) {
-      throw new Error('Configuration validation failed:\n' + errors.join('\n'));
+      throw new Error('Configuration validation failed:\n  - ' + errors.join('\n  - '));
     }
+
+    return true;
   }
 
   /**
-   * Get all configuration as object
+   * Get summary of current configuration (safe for logging)
    */
-  toJSON() {
+  getSummary() {
     return {
-      version: this.version,
-      telegram: this.telegram,
-      ai: this.ai,
-      rateLimit: this.rateLimit,
-      logging: this.logging,
-      profiling: this.profiling,
-      security: this.security,
-      dataDir: this.dataDir,
-      backupRetention: this.backupRetention,
+      telegram: {
+        tokenConfigured: !!this.telegram.token,
+        adminUsername: this.telegram.adminUsername || '(not set)',
+        adminChatId: this.telegram.adminChatId || '(not set)',
+        pollInterval: this.telegram.pollInterval
+      },
+      ollama: {
+        url: this.ollama.url,
+        model: this.ollama.model,
+        availableModels: this.ollama.availableModels
+      },
+      openai: {
+        configured: !!this.openai.apiKey
+      },
+      bot: {
+        messageChunkSize: this.bot.messageChunkSize,
+        rateLimitPerMin: this.bot.rateLimitPerMin,
+        rateLimitPerHour: this.bot.rateLimitPerHour
+      },
+      data: {
+        dir: this.data.dir,
+        backupRetention: this.data.backupRetention
+      },
+      logging: {
+        level: this.logging.level,
+        file: this.logging.file
+      }
     };
   }
 }
 
-/**
- * Default data directory (used by tests and utilities)
- */
-Config.DATA_DIR = path.join(__dirname, '..', 'data');
+// Singleton instance
+let configInstance = null;
 
-module.exports = Config;
+/**
+ * Get configuration instance (singleton)
+ * @returns {Config} Configuration instance
+ */
+function getConfig() {
+  if (!configInstance) {
+    configInstance = new Config();
+    configInstance.load();
+  }
+  return configInstance;
+}
+
+module.exports = {
+  Config,
+  getConfig
+};

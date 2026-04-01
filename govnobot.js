@@ -93,6 +93,111 @@ const state = {
   cacheDir: null,
 };
 
+// Singleton lock path to prevent multiple processes
+const getLockFilePath = () => path.join(state.dataDir || __dirname, 'govnobot.lock');
+
+const isProcessRunning = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+
+const acquireSingletonLock = () => {
+  const lockFile = getLockFilePath();
+
+  try {
+    const fd = fs.openSync(lockFile, 'wx');
+    fs.writeSync(fd, JSON.stringify({ pid: process.pid, started: new Date().toISOString() }));
+    fs.closeSync(fd);
+    log(`✅ Acquired singleton lock: ${lockFile}`, 'INFO');
+    return true;
+  } catch (err) {
+    if (err.code !== 'EEXIST') {
+      log(`Failed to acquire lock: ${err.message}`, 'ERROR');
+      return false;
+    }
+
+    // Lock exists, verify stale
+    try {
+      const contents = fs.readFileSync(lockFile, 'utf8');
+      const lockInfo = JSON.parse(contents);
+      const pid = parseInt(lockInfo.pid, 10);
+
+      if (Number.isInteger(pid) && pid > 0 && isProcessRunning(pid)) {
+        log(`Another GovnoBot instance is already running (PID ${pid}). Exiting.`, 'ERROR');
+        return false;
+      }
+
+      // Stale lock file, remove and retry
+      log(`Stale lock found (PID ${pid}). Removing and retrying.`, 'WARN');
+      fs.unlinkSync(lockFile);
+      return acquireSingletonLock();
+    } catch (innerErr) {
+      log(`Error reading stale lock file: ${innerErr.message}. Removing it.`, 'WARN');
+      try { fs.unlinkSync(lockFile);} catch {}
+      return acquireSingletonLock();
+    }
+  }
+};
+
+const releaseSingletonLock = () => {
+  const lockFile = getLockFilePath();
+  try {
+    if (fs.existsSync(lockFile)) {
+      fs.unlinkSync(lockFile);
+      log(`✅ Released singleton lock: ${lockFile}`, 'INFO');
+    }
+  } catch (err) {
+    log(`Failed to release singleton lock: ${err.message}`, 'WARN');
+  }
+};
+
+// In-memory queue for command processing to handle long-running commands
+const commandQueue = [];
+let isProcessingQueue = false;
+
+const COMMAND_TIMEOUT_MS = 120000; // 2 minutes
+
+const promiseTimeout = (promise, ms) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Promise timed out after ${ms}ms`)), ms);
+  });
+
+  return Promise.race([
+    promise.finally(() => clearTimeout(timeoutId)),
+    timeoutPromise,
+  ]);
+};
+
+const enqueueCommand = (message) => {
+  commandQueue.push(message);
+  if (!isProcessingQueue) {
+    processCommandQueue();
+  }
+};
+
+const processCommandQueue = async () => {
+  isProcessingQueue = true;
+  while (commandQueue.length > 0) {
+    const message = commandQueue.shift();
+    try {
+      await promiseTimeout(handleCommand(message), COMMAND_TIMEOUT_MS);
+    } catch (err) {
+      const chatId = message && message.chat ? message.chat.id : null;
+      log(`Command processing error: ${err.message}`, 'ERROR');
+      if (chatId) {
+        await sendTelegramMessage(chatId, `⚠️ Command processing failed or timed out: ${err.message}`);
+      }
+    }
+  }
+  isProcessingQueue = false;
+};
+
+
 // Initialize directories
 const initDirectories = () => {
   state.historyDir = path.join(state.dataDir, 'history');
@@ -1110,10 +1215,10 @@ const startBotPolling = async () => {
 
           try {
             if (update.message) {
-              await handleCommand(update.message);
+              enqueueCommand(update.message);
             }
           } catch (error) {
-            log(`Error processing update ${update.update_id}: ${error.message}`, 'ERROR');
+            log(`Error queueing update ${update.update_id}: ${error.message}`, 'ERROR');
           }
         }
       }
@@ -1160,6 +1265,11 @@ const main = async () => {
 
     // Initialize
     initDirectories();
+
+    // Ensure only one instance runs at a time
+    if (!acquireSingletonLock()) {
+      process.exit(0);
+    }
 
     log('---------------------------------------');
     log(`🤖 GovnoBot v${CONFIG.version} - Starting...`);
@@ -1218,7 +1328,18 @@ const main = async () => {
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   log('Received SIGINT. Shutting down gracefully...');
+  releaseSingletonLock();
   process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  log('Received SIGTERM. Shutting down gracefully...');
+  releaseSingletonLock();
+  process.exit(0);
+});
+
+process.on('exit', () => {
+  releaseSingletonLock();
 });
 
 // Start the bot

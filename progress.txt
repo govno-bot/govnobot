@@ -1,5 +1,7 @@
 # [2026-02-26T22:45:00.000Z] ✅ Completed: Fix heap out of memory bug - Refactored test runner (test/run-all.js) to run each test file in a separate process using child_process.fork, preventing memory leaks and heap exhaustion during large or repeated test runs. Updated PRD.md and progress.txt as required.
 
+[2026-03-29T15:07:32.036Z] ✅ Completed: UX: Add Telegram Bot Commands Menu (via setMyCommands) so users don't have to type / to see options (in resonable cases) - Added setMyCommands method to TelegramAPIClient, getMenuCommands method to CommandHandler with descriptions for public commands, and automatic menu setup during bot startup. Updated PRD.md and progress.txt as required.
+
 [2026-02-26T22:00:00.000Z] ✅ Completed: Implement Admin Commands: /sh, /agent - Added /sh and /agent admin commands to CommandHandler with audit logging, shell execution (whitelist, output/error handling), and placeholder agent logic. Added unit tests for admin/non-admin, output, and error cases. Updated PRD.md and progress.txt as required.
 # [2026-02-26T21:59:00.000Z] ✅ Completed: Implement Public Commands: /start, /help, /ask, /fix, /history, /model, /settings, /stats, /status, /version - Implemented and registered all public commands in CommandHandler (including /fix, /stats, /version). Updated PRD.md and progress.txt as required. All tests pass.
 [2026-02-26T21:55:00.000Z] ✅ Completed: Fix settings.store bug - Removed stray catch block causing syntax error in src/storage/settings-store.js; all tests now pass. Updated PRD.md and progress.txt as required.
@@ -144,3 +146,31 @@ C o m p l e t e d :   * * S e l f - R e f l e c t i o n   &   T a s k   B r e a 
 [2026-03-18T04:19:30.253Z] ✅ Completed: update version and changelog, commit changes (took 83s)
 [2026-03-18T05:10:00.000Z] ? Completed: update version and changelog, commit changes - Bumped version to 1.10.1 in `package.json`, added `CHANGELOG.md` entry for 1.10.1, updated `PRD.md` to mark task complete, and appended this progress entry. Committed as: "chore(release): bump version and update changelog".
 [2026-03-20T09:52:31.9613222+02:00]  Completed: Release 1.10.2 - Bumped version, updated CHANGELOG.md, fixed reminder lock and persona escaping, updated tests
+[2026-03-29T15:07:32.036Z] ✅ Completed: Implement HistoryStore archive mechanism. If a user's history file grows to 5MB+, JSON.parse(fs.readFileSync) will block the event loop. So when the history file is almost 5MB you should archive it and create new one. (took 143s)
+[2026-03-29T00:00:00.000Z] ? Completed: Implement HistoryStore archive mechanism. Added rotation in src/storage/history-store.js to archive JSON history files above 4.8MB before parse and start a new file; added unit test coverage in test/unit/history-store.test.js.
+[2026-03-29T15:10:07.697Z] ✅ Completed: UX: Add Telegram Bot Commands Menu (via setMyCommands) so users don't have to type / to see options (in resonable cases) (took 144s)
+[2026-03-29T15:11:10.669Z] ✅ Completed: DevOps: Create Systemd template for "always-on" persistence. (took 51s)
+[2026-03-29T16:11:17.4446206+01:00]
+✅
+Completed:
+DevOps:
+Create
+Systemd
+template
+for
+always-on
+persistence.
+-
+Added
+systemd/govnobot@.service
+template
+and
+DEPLOYMENT.md
+Linux
+instructions.
+[2026-03-29T15:20:00.000Z] ✅ Completed: DevOps: Create Systemd template for "always-on" persistence. - Added systemd/govnobot@.service template and DEPLOYMENT.md Linux instructions.
+[2026-03-29T15:14:11.948Z] ✅ Completed: Development: Add Image Generation support via your internal "Nano Banana 2" capabilities using the Telegram sendPhoto API. (took 169s)
+[2026-03-29T16:14:28.0810506+01:00] ✅ Completed: Development: Add Image Generation support via your internal 'Nano Banana 2' capabilities using the Telegram sendPhoto API. - Added NanoBanana2 provider (src/ai/nano-banana-2.js), wired it into FallbackChain and initialization, updated config fallback order, and added unit tests
+[2026-03-29T16:00:00.000Z] ✅ Completed: Development: Add Image Generation support via your internal "Nano Banana 2" capabilities using the Telegram sendPhoto API. - Added NanoBanana2 provider (src/ai/nano-banana-2.js), wired it into FallbackChain and initialization, updated config fallback order, and added unit tests
+[2026-03-29T15:27:00.997Z] ✅ Completed: DevOps: Make sure system template and everything else is ready for "always-on" persistence on Windows for nodejs version. Provide clear step-by-step instractions on how to setup and test it. (took 77s)
+[2026-03-29T16:30:00.000Z] ✅ Completed: DevOps: Make sure system template and everything else is ready for "always-on" persistence on Windows for nodejs version. Provided Windows NSSM + Task Scheduler instructions in DEPLOYMENT.md and added helper script scripts/install-windows-node-service.ps1.

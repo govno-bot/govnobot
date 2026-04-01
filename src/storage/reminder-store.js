@@ -1,9 +1,9 @@
 const path = require('path');
 const fs = require('fs');
 const { withFileLock } = require('./file-lock');
-const Config = require('../config');
-const config = new Config();
-const DATA_DIR = config.dataDir;
+const { getConfig } = require('../config');
+const config = getConfig();
+const DATA_DIR = config.data.dir;
 
 const REMINDERS_PATH = path.join(DATA_DIR, 'reminders.json');
 

@@ -37,7 +37,7 @@ class ReminderScheduler {
                     await this.reminderStore.remove(reminder.id);
                     this.logger.info(`Sent reminder ${reminder.id} to chat ${reminder.chatId}`);
                 } catch (error) {
-                    this.logger.error(`Failed to send reminder ${reminder.id} or remove it:`, error);
+                    this.logger.error(`ChatId: ${reminder.chatId} - Failed to send reminder ${reminder.id} or remove it:`, error);
                     // Decide on a retry strategy or if the reminder should be kept or removed.
                     // For now, we'll leave it and it will be picked up again.
                 }

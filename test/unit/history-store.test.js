@@ -9,7 +9,7 @@ const TEST_FILE = path.join(TEST_DIR, `${TEST_CHAT_ID}.json`);
 
 function cleanup() {
   if (fs.existsSync(TEST_FILE)) fs.unlinkSync(TEST_FILE);
-  if (fs.existsSync(TEST_DIR)) fs.rmdirSync(TEST_DIR, { recursive: true });
+  if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
 }
 
 module.exports.run = async function(runner) {
@@ -63,6 +63,25 @@ module.exports.run = async function(runner) {
   fs.writeFileSync(TEST_FILE, 'not json');
   loaded = await store.loadHistory(TEST_CHAT_ID);
   runner.assertDeepEqual(loaded, [], 'should handle corrupted file gracefully');
+
+  cleanup();
+  store = new HistoryStore(TEST_DIR);
+
+  // create an oversized history file and verify rotation/archive occurs
+  const hugeMessage = { role: 'user', content: 'x'.repeat(6 * 1024 * 1024) };
+  fs.writeFileSync(TEST_FILE, JSON.stringify([hugeMessage], null, 2), 'utf8');
+
+  await store.addMessage(TEST_CHAT_ID, 'user', 'new-message');
+
+  const exists = fs.existsSync(TEST_FILE);
+  runner.assert(exists, 'history file should exist after rotation');
+
+  const loadedAfterRotate = await store.loadHistory(TEST_CHAT_ID);
+  runner.assertEqual(loadedAfterRotate.length, 1, 'should have one new message after rotation');
+  runner.assertEqual(loadedAfterRotate[0].content, 'new-message', 'should append new message to fresh history');
+
+  const archiveFiles = fs.readdirSync(TEST_DIR).filter(f => f.endsWith('.archive.json'));
+  runner.assert(archiveFiles.length > 0, 'should create an archive file when history exceeds threshold');
 
   cleanup();
 }

@@ -19,7 +19,7 @@ const mockConfig = {
     defaultModel: 'deepseek-r1:8b',
     availableModels: ['deepseek-r1:8b', 'mistral', 'codellama']
   },
-  dataDir: path.join(__dirname, '..', '..', 'temp-test-settings-cmd')
+  data: { dir: path.join(__dirname, '..', '..', 'temp-test-settings-cmd') }
 };
 
 const mockLogger = {
@@ -31,8 +31,8 @@ const mockLogger = {
 
 // Helper to clean up test directory
 const cleanup = () => {
-  if (fs.existsSync(mockConfig.dataDir)) {
-    fs.rmSync(mockConfig.dataDir, { recursive: true, force: true });
+  if (fs.existsSync(mockConfig.data.dir)) {
+    fs.rmSync(mockConfig.data.dir, { recursive: true, force: true });
   }
 };
 
@@ -49,10 +49,10 @@ module.exports.run = async function(runner) {
   cleanup();
   
   // Ensure data dir exists
-  fs.mkdirSync(path.join(mockConfig.dataDir, 'settings'), { recursive: true });
+  fs.mkdirSync(path.join(mockConfig.data.dir, 'settings'), { recursive: true });
 
   const chatId = 12345;
-  const store = new SettingsStore(chatId, path.join(mockConfig.dataDir, 'settings'));
+  const store = new SettingsStore(chatId, path.join(mockConfig.data.dir, 'settings'));
 
   // Test 1: /settings (view) - defaults
   {

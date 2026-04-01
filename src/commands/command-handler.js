@@ -233,6 +233,31 @@ class CommandHandler {
   }
 
   /**
+   * Get commands for the bot menu (setMyCommands)
+   * Returns array of {command, description} objects for public commands
+   */
+  getMenuCommands() {
+    const menuCommands = [
+      { command: 'start', description: 'Start the bot and get welcome message' },
+      { command: 'help', description: 'Show all available commands' },
+      { command: 'ask', description: 'Ask a question to AI' },
+      { command: 'fix', description: 'Get AI-powered fix suggestions' },
+      { command: 'model', description: 'View or change AI model' },
+      { command: 'settings', description: 'View or update your settings' },
+      { command: 'history', description: 'View your conversation history' },
+      { command: 'status', description: 'Show bot status and uptime' },
+      { command: 'version', description: 'Show bot version' },
+      { command: 'remind', description: 'Set a reminder' },
+      { command: 'persona', description: 'Set bot personality' },
+      { command: 'gm', description: 'Game Master mode for storytelling' },
+      { command: 'imagine', description: 'Generate images with AI' },
+    ];
+
+    // Only include commands that are actually registered
+    return menuCommands.filter(cmd => this.publicCommands.has(cmd.command.toLowerCase()));
+  }
+
+  /**
    * Handle /fix command
    */
   async handleFix(context) {
@@ -575,7 +600,7 @@ ${availableModels.map(m => `${m.id} (${m.provider} - ${m.source})`).join(', ')}
     await this.client.sendChatAction(chatId, 'typing');
     
     // Load user settings (for model, system prompt, and language)
-    const settingsDir = path.join(this.config.dataDir, 'settings');
+    const settingsDir = path.join(this.config.data.dir, 'settings');
     let settings = { model: this.config.ai.defaultModel, systemPrompt: 'You are a helpful assistant.', language: 'en' };
     try {
       const store = new SettingsStore(chatId, settingsDir);
@@ -585,7 +610,7 @@ ${availableModels.map(m => `${m.id} (${m.provider} - ${m.source})`).join(', ')}
     }
     
     // Save user message to history
-    const historyDir = path.join(this.config.dataDir, 'history');
+    const historyDir = path.join(this.config.data.dir, 'history');
     const historyStore = new HistoryStore(historyDir);
     
     try {
@@ -642,7 +667,7 @@ ${availableModels.map(m => `${m.id} (${m.provider} - ${m.source})`).join(', ')}
    */
   async handleModel(context) {
     const { chatId, args } = context;
-    const settingsDir = path.join(this.config.dataDir, 'settings');
+    const settingsDir = path.join(this.config.data.dir, 'settings');
     let settings;
     try {
       const store = new SettingsStore(chatId, settingsDir);
@@ -699,7 +724,7 @@ Use: /model &lt;model_name&gt;
    */
   async handleSettings(context) {
     const { chatId, args } = context;
-    const settingsDir = path.join(this.config.dataDir, 'settings');
+    const settingsDir = path.join(this.config.data.dir, 'settings');
     let settings;
 
     // Load settings
@@ -799,7 +824,7 @@ Examples:
     const { chatId, args } = context;
     
     // Initialize store
-    const historyDir = path.join(this.config.dataDir, 'history');
+    const historyDir = path.join(this.config.data.dir, 'history');
     const store = new HistoryStore(historyDir);
     
     // Subcommand: clear

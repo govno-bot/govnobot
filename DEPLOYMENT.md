@@ -14,7 +14,7 @@ The deployment system has been rewritten to use **Windows Task Scheduler** inste
 ✅ **Resource Cleanup** - No lingering background processes  
 ✅ **Health Monitoring** - Continuous health checks with auto-recovery  
 
-### Architecture
+### Architecture (Windows)
 
 ```
 Windows Task Scheduler
@@ -27,6 +27,73 @@ Exit cleanly
     ↓ (wait for next trigger)
 Repeat
 ```
+
+#### Windows Node.js always-on service (NSSM + Task Scheduler)
+
+For the Node.js edition (`govnobot.js` / `src/index.js`), use a Windows service wrapper (recommended: NSSM) or scheduled task with restart policy.
+
+1. Install NSSM:
+   - Download from https://nssm.cc/download
+   - Extract `nssm.exe` to `C:\Windows\System32` or a directory in PATH.
+
+2. Install GovnoBot service:
+   ```powershell
+   $botDir = "C:\path\to\govnobot"
+   $node = (Get-Command node).Source
+   $envFile = Join-Path $botDir ".env"
+
+   nssm install GovnoBotNode \"$node\" \"$botDir\"\src\index.js
+   nssm set GovnoBotNode AppDirectory $botDir
+   nssm set GovnoBotNode AppStdout \"$botDir\\govnobot-node.log\"
+   nssm set GovnoBotNode AppStderr \"$botDir\\govnobot-node.err.log\"
+   nssm set GovnoBotNode Start SERVICE_AUTO_START
+   nssm set GovnoBotNode AppEnvironmentExtra TELEGRAM_GOVNOBOT_TOKEN=%TELEGRAM_GOVNOBOT_TOKEN%
+   nssm set GovnoBotNode AppEnvironmentExtra TELEGRAM_GOVNOBOT_ADMIN_CHATID=%TELEGRAM_GOVNOBOT_ADMIN_CHATID%
+   nssm set GovnoBotNode AppEnvironmentExtra TELEGRAM_GOVNOBOT_ADMIN_USERNAME=%TELEGRAM_GOVNOBOT_ADMIN_USERNAME%
+   nssm set GovnoBotNode AppEnvironmentExtra NODE_ENV=production
+   nssm set GovnoBotNode AppRestartDelay 5000
+   nssm set GovnoBotNode AppRotateFiles 1
+   nssm set GovnoBotNode AppRotateOnline 1
+   nssm set GovnoBotNode AppRotateSeconds 604800
+   nssm set GovnoBotNode AppExit 1
+   nssm set GovnoBotNode AppRestart 1
+   nssm set GovnoBotNode AppThrottle 1500
+   nssm set GovnoBotNode AppWow64 1
+
+   nssm start GovnoBotNode
+   ```
+
+3. Alternative (Task Scheduler + node):
+   ```powershell
+   $action = New-ScheduledTaskAction -Execute "$(Get-Command node).Source" -Argument "`"$botDir\\src\\index.js`""
+   $trigger = New-ScheduledTaskTrigger -AtStartup -RepetitionInterval (New-TimeSpan -Seconds 30) -RepeatIndefinitely
+   $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest
+   Register-ScheduledTask -TaskName "GovnoBotNode" -Action $action -Trigger $trigger -Principal $principal -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 999 -RestartInterval (New-TimeSpan -Seconds 10))
+   Start-ScheduledTask -TaskName "GovnoBotNode"
+   ```
+
+4. Verify:
+   - `nssm status GovnoBotNode` (or Task Scheduler UI)
+   - `Get-EventLog -LogName Application -Newest 20 | where {$_.Source -eq 'nssm'}`
+   - Validate bot in Telegram: `/status` command, `/version` command.
+
+---
+
+### Architecture (Linux/macOS with systemd)
+
+```
+systemd timer + service
+    ↓ (on boot + restart on failure)
+node src/index.js
+    ↓ (runs continuously)
+Telegram API
+    ↓ (processes updates)
+Restart on failure with exponential backoff
+```
+
+This repository includes a Systemd template unit: `systemd/govnobot@.service`.
+
+Use the template for always-on persistence on Linux systems.
 
 Each execution:
 1. Polls Telegram API once

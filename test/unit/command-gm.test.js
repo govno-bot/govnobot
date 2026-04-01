@@ -12,7 +12,7 @@ module.exports.run = async function(runner) {
     context = {
       chatId: 100,
       args: [],
-      config: { dataDir: path.join(__dirname, '..', 'data', 'gmtestdata') },
+      config: { data: { dir: path.join(__dirname, '..', 'data', 'gmtestdata') } },
       logger: { error: () => {} },
       fallbackChain: {
         invoke: async (payload) => {

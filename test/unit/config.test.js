@@ -100,8 +100,7 @@ async function run(runner) {
     delete process.env.TELEGRAM_ADMIN_USERNAME;
     delete process.env.TELEGRAM_ADMIN_CHATID;
 
-    const config = new Config();
-    config.load();
+    const config = Config.getConfig();
 
     let validationFailed = false;
     try {

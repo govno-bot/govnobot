@@ -33,7 +33,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-      dataDir: TEST_DATA_DIR,
+      data: { dir: TEST_DATA_DIR },
       ai: { availableModels: ['gpt'] },
       version: version
     };
@@ -70,7 +70,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-      dataDir: TEST_DATA_DIR,
+      data: { dir: TEST_DATA_DIR },
       ai: { availableModels: ['gpt'] },
       version: version
     };
@@ -105,7 +105,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-      dataDir: TEST_DATA_DIR,
+      data: { dir: TEST_DATA_DIR },
       ai: { availableModels: ['gpt'] },
       version: version
     };
@@ -138,7 +138,7 @@ module.exports.run = async function(runner) {
       }
     };
 
-    const config = { dataDir: TEST_DATA_DIR };
+    const config = { data: { dir: TEST_DATA_DIR } };
     const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
     const handler = new CommandHandler(fakeClient, config, logger, null, {});
     
@@ -170,7 +170,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { 
-      dataDir: TEST_DATA_DIR,
+      data: { dir: TEST_DATA_DIR },
       ai: { availableModels: ['gpt'] },
       version: version
     };

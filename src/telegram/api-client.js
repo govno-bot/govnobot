@@ -283,6 +283,21 @@ class TelegramAPIClient {
   async getWebhookInfo() {
     return this.request('POST', 'getWebhookInfo');
   }
+
+  /**
+   * Set bot commands menu
+   * @param {Array} commands - Array of command objects [{command: string, description: string}]
+   * @returns {Promise<object>} - Response
+   */
+  async setMyCommands(commands) {
+    if (!Array.isArray(commands)) {
+      throw new Error('commands must be an array');
+    }
+    
+    return this.request('POST', 'setMyCommands', {
+      commands: commands,
+    });
+  }
 }
 
 /**

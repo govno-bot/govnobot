@@ -6,32 +6,11 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 > **⚠️ Important:** Always make edits to `PRD.md` as the *final step* in your workflow. Ensure all implementation and testing are complete before updating this document to reflect the final, verified state of the project.
 
 ## Tasks
- - [x] Implement "/jack [message]" command in govnobot node.js version. Use `sendMessageToJack.ps1` as a reference.  
-- [x] Continue R&D. Add at least 6 tasks to this list, the last one is a copy of the very this one 
-- [x] Research multi-language support and translation pipelines for bot responses.
-- [x] Explore plugin-based command discovery and hot-reload for rapid feature experimentation.
-- [x] Investigate memory and CPU profiling strategies for long-running agentic loops.
- - [x] Evaluate alternative local/remote LLM providers (e.g., llama.cpp, local Ollama) and fallback strategies.
-- [x] Draft a security audit checklist for Telegram bot config, permissions, and secret management.
-- [x] Continue R&D. Add at least 6 tasks to this list, the last one is a copy of the very this one
-- [x] Add a model discovery endpoint and improve `/model list` output for local/remote models.
-- [x] Add metrics collection (latency/errors/cost) per LLM provider and dashboarding hooks.
-- [SKIP] Continue R&D. Add at least 6 tasks to this list, the last one is a copy of the very this one
- - [x] update deployment checklist, fix/add deployment scripts if needed
-- [x] update version and changelog, commit changes
-### Previous Tasks
-- [x] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood." (Fixed missing initialization in entry point).
-- [x] **Advanced Agentic Loop:** Implement a continuous, self-prompting evaluation loop where the bot formulates its own goals, checks constraints, and queries the environment or users without explicit prompting.
-- [x] **Notepad & Todo-List Memory:** Give the bot a scratchpad / todo-list to persist its running thoughts, planned autonomous actions, and multi-step reasoning across polling/restart cycles.
-- [x] **Self-Reflection & Task Breakdown:** When given an ambiguous goal, the bot uses its notepad to break down the task, schedule execution via the reminder/scheduler subsystem, and follow up proactively.
-- [x] **Scheduled Messages & Reminders:** Implement a `/remind <time> <message>` command.
-- [x] **Health Check & Error Telemetry:** Implement `/logs` command.
-- [x] **Conversation Personalities:** Allow users to set the bot's personality (e.g., `/persona pirate`, `/persona therapist`).
-- [x] **Inline AI Queries:** Allow the bot to respond when mentioned directly in a chat without a command prefix.
-- [x] **Game Master Mode (Phased Approach):** Stateless, improv storytelling (`/gm <scenario>`) and a stateful campaign system.
-- [x] **Image Generation (with proper architecture):** `/imagine <prompt>` command.
-- [x] **Voice Message Transcription:** Transcribe user voice messages and feed them to the AI.
-
+- [x] Implement HistoryStore archive mechanism. If a user's history file grows to 5MB+, JSON.parse(fs.readFileSync) will block the event loop. So when the history file is almost 5MB you should archive it and create new one.
+- [x] UX: Add Telegram Bot Commands Menu (via setMyCommands) so users don't have to type / to see options (in resonable cases)
+- [x] DevOps: Create Systemd template for "always-on" persistence.
+- [x] Development: Add Image Generation support via your internal "Nano Banana 2" capabilities using the Telegram sendPhoto API.
+- [x] DevOps: Make sure system template and everything else is ready for "always-on" persistence on Windows for nodejs version. Provide clear step-by-step instractions on how to setup and test it.
 ## Implementation Status
 
 ### Core Modules
