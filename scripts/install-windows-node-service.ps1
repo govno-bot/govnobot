@@ -83,13 +83,16 @@ function Register-WindowsTask {
     Set-Content -Path $wrapperBatch -Value $batchContent -Encoding ASCII
     Write-Host "Created wrapper batch: $wrapperBatch"
 
-    # Use schtasks to create a task with 1-minute repetition.
-    # 
+    # Use schtasks to create a task that starts on machine startup and stays running.
     # Avoid the need for user password by running as SYSTEM.
-    $schtaskCmd = "schtasks /create /tn `"$taskName`" /tr `"$wrapperBatch`" /sc MINUTE /mo 1 /ru SYSTEM /rl HIGHEST /f"
+    $schtaskCmd = "schtasks /create /tn `"$taskName`" /tr `"$wrapperBatch`" /sc ONSTART /ru SYSTEM /rl HIGHEST /f"
     
     Write-Host "Creating scheduled task with command: $schtaskCmd"
     $createOutput = cmd.exe /c $schtaskCmd 2>&1
+
+    # Start the task immediately
+    Write-Host "Starting scheduled task..."
+    Start-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Write-Host $createOutput
     if ($LastExitCode -ne 0) {
         Write-Error "schtasks failed with exit code $LastExitCode"

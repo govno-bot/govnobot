@@ -1,6 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "C:\Users\student\govnobot"
+cd /d "
+C:\Users\student\govnobot
+"
 
 REM Load .env file if it exists
 if exist ".env" (
@@ -12,6 +14,8 @@ if exist ".env" (
 )
 
 REM Run Node.js with the bot script
-"C:\Program Files\nodejs\node.exe" "C:\Users\student\govnobot\src\index.js"
-
+"
+C:\Program Files\nodejs\node.exe
+" "
+C:\Users\student\govnobot\src\index.js
 "

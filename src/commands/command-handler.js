@@ -46,26 +46,79 @@ class CommandHandler {
     // Ephemeral session tracking: { [chatId]: { history: [], settings: {}, ... } }
     this.ephemeralSessions = {};
     this.ephemeralTimeoutMs = 30 * 60 * 1000; // 30 min default
+
+    // Register core commands
+    this.registerPublicCommand('status', this.handleStatus.bind(this));
+    this.registerPublicCommand('version', this.handleVersion.bind(this));
+    this.registerPublicCommand('help', this.handleHelp.bind(this));
+    this.registerPublicCommand('ask', this.handleAsk.bind(this));
+    this.registerPublicCommand('model', this.handleModel.bind(this));
+    this.registerPublicCommand('history', this.handleHistory.bind(this));
+    this.registerPublicCommand('settings', this.handleSettings.bind(this));
+
+    // Register external commands
+    this.registerPublicCommand(remindCommand.name, remindCommand.handler);
+    this.registerPublicCommand(personaCommand.name, personaCommand.handler);
+    this.registerPublicCommand(gmCommand.name, gmCommand.handler);
+    this.registerPublicCommand(imagineCommand.name, imagineCommand.handler);
+
+    // Admin commands
+    // Note: sh, agent, audit are handled inline in the handle() method
+    this.registerAdminCommand(logsCommand.name, logsCommand.handler);
+
+    console.log('Registered public commands:', Object.keys(this.publicCommands));
+    console.log('Registered admin commands:', Object.keys(this.adminCommands));
+  }
+
+  /**
+   * Returns an array of Telegram Menu commands (for setMyCommands)
+   */
+  getMenuCommands() {
+    const candidates = [
+      { command: 'start', description: 'Start the bot and get a welcome message' },
+      { command: 'help', description: 'Show available commands' },
+      { command: 'ask', description: 'Ask a question to AI' },
+      { command: 'status', description: 'Show bot status and uptime' },
+      { command: 'version', description: 'Show bot version' },
+      { command: 'remind', description: 'Set a reminder' },
+      { command: 'history', description: 'View conversation history' },
+      { command: 'model', description: 'View/change AI model' },
+      { command: 'persona', description: 'Set personality' },
+      { command: 'gm', description: 'Game Master mode' },
+      { command: 'imagine', description: 'Image generation' }
+    ];
+
+    return candidates.filter(c => this.publicCommands[c.command]).map(c => ({ command: c.command, description: c.description }));
   }
 
   /**
    * Main command dispatcher (simplified for patch)
    */
   async handle(context) {
-    const text = (context.text || '').trim();
     const chatId = context.chatId || (context.message && context.message.chat && context.message.chat.id);
-    // Rate limiting: short-circuit if present
-    try {
-      if (this.rateLimiter && typeof this.rateLimiter.isAllowed === 'function') {
-        if (!this.rateLimiter.isAllowed(chatId)) {
-          const status = (this.rateLimiter.getStatus && typeof this.rateLimiter.getStatus === 'function') ? this.rateLimiter.getStatus(chatId) : null;
-          const msg = status ? `Rate limit exceeded` : 'Rate limit exceeded';
-          await this.client.sendMessage(chatId, msg);
-          return;
+    const text = (context.message && context.message.text || context.text || '').trim();
+    if (context.message && context.message.text) {
+      this.logger.debug(`handle() - Processing message: "${context.message.text}" from chat ${chatId}`);
+    }
+    
+    // Check if user is admin (admin users bypass rate limits)
+    const from = context.message && context.message.from ? context.message.from : {};
+    const isAdmin = (from.username && this.config && this.config.telegram && from.username === this.config.telegram.adminUsername) || (this.config && this.config.telegram && this.config.telegram.adminChatId && from.id === this.config.telegram.adminChatId);
+    
+    // Rate limiting: short-circuit if present (skip for admins)
+    if (!isAdmin) {
+      try {
+        if (this.rateLimiter && typeof this.rateLimiter.isAllowed === 'function') {
+          if (!this.rateLimiter.isAllowed(chatId)) {
+            const status = (this.rateLimiter.getStatus && typeof this.rateLimiter.getStatus === 'function') ? this.rateLimiter.getStatus(chatId) : null;
+            const msg = status ? `Rate limit exceeded` : 'Rate limit exceeded';
+            await this.client.sendMessage(chatId, msg);
+            return;
+          }
         }
+      } catch (e) {
+        // Ignore rate limiter errors and continue
       }
-    } catch (e) {
-      // Ignore rate limiter errors and continue
     }
     // Route inline mentions or replies to the bot as /ask queries
     if (context.message && this.botInfo) {
@@ -125,24 +178,29 @@ class CommandHandler {
       const parts = msgText.split(/\s+/);
       let cmd = parts[0].slice(1).split('@')[0];
       const args = parts.slice(1);
-      // Admin commands check
-      const from = context.message.from || {};
-      const isAdmin = (from.username && this.config && this.config.telegram && from.username === this.config.telegram.adminUsername) || (this.config && this.config.telegram && this.config.telegram.adminChatId && from.id === this.config.telegram.adminChatId);
+      this.logger.debug(`Parsed command: "${cmd}" with args: ${JSON.stringify(args)}`);
 
+      this.logger.debug(`Checking publicCommands: ${JSON.stringify(Object.keys(this.publicCommands))}`);
+      this.logger.debug(`Looking for cmd='${cmd}' in publicCommands. Exists: ${!!this.publicCommands[cmd]}`);
       if (this.publicCommands[cmd]) {
+        this.logger.info(`Routing public command: ${cmd}`);
         try {
-          await this.publicCommands[cmd]({ chatId, args, message: context.message, telegramApiClient: this.client, config: this.config });
+          const result = await this.publicCommands[cmd]({ chatId, args, message: context.message, telegramApiClient: this.client, config: this.config, reminderStore: this.reminderStore, logger: this.logger });
+          this.logger.debug(`Command ${cmd} completed with result: ${JSON.stringify(result)}`);
         } catch (err) {
+          this.logger.error(`Error handling command ${cmd}:`, err);
           await this.client.sendMessage(chatId, 'An error occurred processing your command');
         }
         return;
       }
+      this.logger.debug(`Command '${cmd}' NOT found in publicCommands`);
 
       if (this.adminCommands[cmd]) {
         if (!isAdmin) return this.client.sendMessage(chatId, 'This command is restricted to admins');
         try {
           await this.adminCommands[cmd]({ chatId, args, message: context.message, telegramApiClient: this.client, config: this.config });
         } catch (err) {
+          this.logger.error(`Error handling admin command ${cmd}:`, err);
           await this.client.sendMessage(chatId, 'An error occurred processing your command');
         }
 
@@ -150,8 +208,10 @@ class CommandHandler {
       }
 
       // Built-in admin commands
+      this.logger.debug(`Checking if "${cmd}" is a built-in admin command (isAdmin=${isAdmin})`);
       if (cmd === 'sh') {
         if (!isAdmin) return this.client.sendMessage(chatId, 'This command is restricted to admins');
+        this.logger.info(`Executing /sh command`);
         const whitelist = (this.config && this.config.security && this.config.security.shCommandWhitelist) || [];
         const cmdName = args && args.length > 0 ? args[0] : '';
         if (whitelist.length > 0 && !whitelist.includes(cmdName)) {
@@ -160,26 +220,54 @@ class CommandHandler {
         const commandStr = args.join(' ');
         const execFn = this.exec || require('child_process').exec;
         try {
-          await new Promise((resolve) => {
-            execFn(commandStr, {}, async (err, stdout, stderr) => {
-              try {
-                if (err) {
-                  await this.client.sendMessage(chatId, `Error: ${err.message}`);
-                } else {
-                  let out = stdout || '';
-                  const limit = 2000;
-                  if (out.length > limit) {
-                    out = out.slice(0, limit) + '\n\n(truncated)';
-                  }
-                  await this.client.sendMessage(chatId, out || '(no output)');
-                }
-              } catch (e) {
-                // ignore
+          const shTimeout = 30000; // 30 second timeout for shell commands
+          await new Promise(async (resolve) => {
+            let completed = false;
+            const timeoutHandle = setTimeout(() => {
+              if (!completed) {
+                completed = true;
+                this.logger.error(`/sh command timed out after ${shTimeout}ms`);
+                this.client.sendMessage(chatId, `Command execution timed out (${shTimeout}ms)`).catch(() => {});
+                resolve();
               }
-              resolve();
-            });
+            }, shTimeout);
+            
+            try {
+              execFn(commandStr, {}, async (err, stdout, stderr) => {
+                if (!completed) {
+                  completed = true;
+                  clearTimeout(timeoutHandle);
+                  try {
+                    if (err) {
+                      this.logger.error(`/sh command error: ${err.message}`);
+                      await this.client.sendMessage(chatId, `Error: ${err.message}`);
+                    } else {
+                      let out = stdout || '';
+                      const limit = 2000;
+                      if (out.length > limit) {
+                        out = out.slice(0, limit) + '\n\n(truncated)';
+                      }
+                      this.logger.debug(`/sh command output: ${out.length} chars`);
+                      await this.client.sendMessage(chatId, out || '(no output)');
+                    }
+                  } catch (e) {
+                    this.logger.error(`Error sending /sh result: ${e.message}`);
+                  }
+                  resolve();
+                }
+              });
+            } catch (e) {
+              if (!completed) {
+                completed = true;
+                clearTimeout(timeoutHandle);
+                this.logger.error(`/sh exec error: ${e.message}`);
+                this.client.sendMessage(chatId, `Error: ${e.message}`).catch(() => {});
+                resolve();
+              }
+            }
           });
         } catch (err) {
+          this.logger.error(`/sh outer catch: ${err.message}`);
           await this.client.sendMessage(chatId, 'An error occurred running command');
         }
         // Audit log
@@ -256,13 +344,8 @@ class CommandHandler {
         return this.handleSettings({ chatId, args, message: context.message });
       }
 
-      if (cmd === 'status') {
-        return this.handleStatus({ chatId, message: context.message });
-      }
-
-      if (cmd === 'version') {
-        return this.handleVersion({ chatId, message: context.message });
-      }
+      // NOTE: status and version are now handled via publicCommands registration above
+      // No need for separate built-in handling - keep that code consolidated
 
       if (cmd === 'ask') {
         // build args from message text if not present
@@ -615,8 +698,22 @@ class CommandHandler {
       }
 
       const inputForChain = [{ role: 'user', content: prompt }];
-      const result = await chain.call(inputForChain, { onToken, isAborted });
-
+      
+      // Add timeout to chain.call() to prevent polling loop from hanging
+      const AI_TIMEOUT = 60000; // 60 second timeout for AI responses
+      let result;
+      try {
+        result = await Promise.race([
+          chain.call(inputForChain, { onToken, isAborted }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('AI response timed out after ' + AI_TIMEOUT + 'ms')), AI_TIMEOUT)
+          )
+        ]);
+      } catch (timeoutErr) {
+        if (this.logger && this.logger.error) this.logger.error('chain.call timeout or error', timeoutErr);
+        await this.client.sendMessage(chatId, 'AI response timed out. Please try again.');
+        return;
+      }
 
       // Persist to history: save user prompt and assistant response
       try {
@@ -825,10 +922,12 @@ CommandHandler.prototype.handleHelp = async function(context) {
  */
 CommandHandler.prototype.handleStatus = async function(context) {
   const chatId = context.chatId || (context.message && context.message.chat && context.message.chat.id);
+  this.logger.info(`handleStatus called for chat ${chatId}`);
   const version = (this.config && this.config.version) || 'unknown';
   const uptime = process.uptime();
   const mem = process.memoryUsage();
   const msg = `<b>Bot Status</b>\nStatus: 🕺Online\nVersion: ${version}\nUptime: ${Math.floor(uptime)}s\nMemory: RSS ${Math.round(mem.rss/1024/1024)}MB\nDefault Model: ${this.config && this.config.ai && this.config.ai.defaultModel ? this.config.ai.defaultModel : 'n/a'}`;
+  this.logger.info(`Sending status to chat ${chatId}`);
   await this.client.sendMessage(chatId, msg, { parse_mode: 'HTML' });
 };
 
@@ -838,6 +937,7 @@ CommandHandler.prototype.handleStatus = async function(context) {
 CommandHandler.prototype.handleVersion = async function(context) {
   const chatId = context.chatId || (context.message && context.message.chat && context.message.chat.id);
   const version = (this.config && this.config.version) || 'unknown';
+  this.logger.info(`handleVersion called for chat ${chatId}: Version: ${version}`);
   await this.client.sendMessage(chatId, `Version: ${version}`, { parse_mode: 'HTML' });
 };
 
@@ -862,7 +962,39 @@ CommandHandler.prototype.handleHistory = async function(context) {
       return this.client.sendMessage(chatId, 'History is empty');
     }
     const lines = history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
-    return this.client.sendMessage(chatId, `History:\n${lines.join('\n\n')}`);
+    let fullText = `History:\n${lines.join('\n\n')}`;
+    
+    // Escape HTML special characters to avoid parse entity errors
+    fullText = fullText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    
+    // Telegram limit is 4096 characters per message. Use existing chunker.
+    const MAX_LENGTH = 3900; // Safe margin below 4096 for Telegram
+    
+    if (fullText.length <= MAX_LENGTH) {
+      return this.client.sendMessage(chatId, fullText);
+    }
+    
+    // Use character-level chunking to ensure no message exceeds limit
+    // This handles cases where a single history entry is very long
+    const chunks = [];
+    let i = 0;
+    while (i < fullText.length) {
+      chunks.push(fullText.substring(i, i + MAX_LENGTH));
+      i += MAX_LENGTH;
+    }
+    
+    // Send each chunk as a separate message
+    for (const chunk of chunks) {
+      if (chunk.trim()) {
+        await this.client.sendMessage(chatId, chunk);
+      }
+    }
+    return;
   }
 
   return this.client.sendMessage(chatId, 'Usage: /history [clear]');

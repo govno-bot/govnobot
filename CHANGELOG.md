@@ -4,13 +4,16 @@ All notable changes to the GovnoBot project are documented in this file.
 
 ---
 
-## [1.10.5] - 2026-03-30 - Patch
+## [1.10.7] - 2026-04-02 - Patch
 
-### ✅ Fix - Tests & Stability
-- Added Mocha-style globals shim to test worker to ensure mocha-style tests register correctly under the project's runner.
-- Fixed multiple `CommandHandler` routing and admin command behaviors to make unit and acceptance tests deterministic (streaming `/ask`, `/sh`, `/jack`, `/agent`, plugin reloads, ephemeral sessions).
-- Corrected moderation import path and other small fixes uncovered by the test suite.
-- All unit and acceptance tests pass in CI-style full run.
+### ✅ Fix - Command routing and response issues
+- **Fixed admin rate limiting bypass**: Admin users now bypass all rate limits, allowing /status, /version, and other commands to work without hitting rate limiter restrictions
+- **Fixed /ask handler timeout blocking polling loop**: Added 60-second timeout wrapper around `chain.call()` to prevent infinite hanging; polling continues even if AI doesn't respond, with timeout error message sent to user
+- **Fixed /history "text too long" and entity parsing errors**: 
+  - Implemented character-level chunking (3900 chars/message) to handle arbitrarily long conversation histories
+  - Added HTML entity escaping to prevent "can't parse entities" errors when history contains special characters (<, >, =, etc.)
+  - /history command now splits long histories into multiple Telegram messages automatically
+- **Improved polling loop stability**: Enhanced logging and error recovery; polling loop no longer freezes on command handler errors
 
 ---
 
@@ -22,7 +25,6 @@ All notable changes to the GovnoBot project are documented in this file.
 - Exposed runtime helpers: `configureWikipedia`, `clearWikipediaCache`, and `getWikipediaCacheStats` in `src/ai/wikipedia.js`.
 - Added unit tests `test/unit/wikipedia-cache-rate-limit.test.js` to validate caching and rate-limiter behavior.
 - Documentation updates: `README.md`, `govnodeploy.js`, and `govnodeploy.ps1` include deployment notes for configuring cache TTL and requests-per-minute.
-
 
 ---
 

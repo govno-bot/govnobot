@@ -9,6 +9,53 @@
 const fs = require('fs');
 const path = require('path');
 
+const LOCK_FILENAME = 'govnobot.lock';
+let lockFilePath = null;
+
+function getLockFilePath() {
+  const dir = (config && config.data && config.data.dir) ? config.data.dir : process.cwd();
+  return path.join(path.resolve(dir), LOCK_FILENAME);
+}
+
+function acquireSingletonLock() {
+  lockFilePath = getLockFilePath();
+
+  try {
+    const fd = fs.openSync(lockFilePath, 'wx');
+    fs.writeSync(fd, JSON.stringify({ pid: process.pid, started: new Date().toISOString() }));
+    fs.closeSync(fd);
+    return true;
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      try {
+        const data = fs.readFileSync(lockFilePath, 'utf8');
+        const payload = JSON.parse(data);
+        const existingPid = parseInt(payload.pid, 10);
+        if (existingPid > 0) {
+          try { process.kill(existingPid, 0); return false; } catch (e) {}
+        }
+      } catch (_) {}
+      try {
+        fs.unlinkSync(lockFilePath);
+        return acquireSingletonLock();
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
+}
+
+function releaseSingletonLock() {
+  try {
+    if (lockFilePath && fs.existsSync(lockFilePath)) {
+      fs.unlinkSync(lockFilePath);
+    }
+  } catch (err) {
+    logger?.warn(`Failed to release singleton lock: ${err.message}`);
+  }
+}
+
 // Import core modules
 const Config = require('./config');
 const Logger = require('./utils/logger');
@@ -41,12 +88,30 @@ async function initialize() {
     // Load configuration
     config = Config.getConfig();
     
-    // Initialize logger
-    logger = new Logger(config.logging.level, config.logging.file);
+    // Initialize logger (support console + file in same object API)
+    logger = new Logger({
+      level: config.logging.level || 'info',
+      console: true,
+      file: true,
+      filePath: config.logging.file || path.join(config.data.dir || '.', 'bot.log')
+    });
     logger.info('🚀 GovnoBot Node.js starting...');
     logger.info(`Version: ${config.version}`);
     logger.info(`Data directory: ${config.data.dir}`);
-    
+
+    // Ensure directories exist
+    ensureDataDirectories();
+
+    // Singleton lock: only allow one process to interact with Telegram at once
+    if (!acquireSingletonLock()) {
+      logger.warn('Another GovnoBot instance is already running. Exiting now.');
+      process.exit(0);
+    }
+
+    process.on('exit', releaseSingletonLock);
+    process.on('SIGINT', () => { releaseSingletonLock(); process.exit(0); });
+    process.on('SIGTERM', () => { releaseSingletonLock(); process.exit(0); });
+
     // Validate required configuration
     if (!config.telegram.token) {
       throw new Error('TELEGRAM_GOVNOBOT_TOKEN environment variable is required');
@@ -221,6 +286,8 @@ function ensureDataDirectories() {
  */
 async function handleUpdate(update) {
   try {
+    logger.info(`[HANDLEUPDATE START] update_id=${update.update_id}, has_message=${!!update.message}, has_callback=${!!update.callback_query}`);
+    
     if (!update.message) {
       logger.debug('Ignoring update without message');
       return;
@@ -231,6 +298,7 @@ async function handleUpdate(update) {
     const userId = message.from.id;
     const username = message.from.username || 'unknown';
     
+    logger.info(`[DIAGNOSTIC] Full update received - text: "${message.text}", chatId: ${chatId}, userId: ${userId}, username: ${username}`);
     logger.debug(`Update from @${username} (${userId}): ${message.text}`);
     
     // Check rate limit

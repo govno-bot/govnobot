@@ -18,6 +18,7 @@ async function startPolling(client, updateHandler, options = {}) {
   let backoffMultiplier = 1;
   const maxBackoff = 300000; // 5 minutes
   const baseBackoff = 1000; // 1 second
+  const apiTimeout = 60000; // 60 second timeout for API calls
   
   logger.info('🔄 Starting Telegram polling...');
   
@@ -25,8 +26,16 @@ async function startPolling(client, updateHandler, options = {}) {
     try {
       logger.debug(`Polling for updates (offset: ${offset})`);
       
-      // Get updates with long polling timeout
-      const response = await client.getUpdates(offset, timeout);
+      // Get updates with long polling timeout and a hard timeout
+      const pollPromise = client.getUpdates(offset, timeout);
+      const response = await Promise.race([
+        pollPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Polling timeout exceeded')), apiTimeout)
+        )
+      ]);
+      
+      logger.debug(`[POLLING] Got response, ok=${response.ok}`);
       
       if (!response.ok || !response.result) {
         logger.warn('Invalid API response');
@@ -35,10 +44,15 @@ async function startPolling(client, updateHandler, options = {}) {
         continue;
       }
       
+      logger.debug(`[POLLING] Processing ${response.result.length} updates`);
+      
       // Process each update
       for (const update of response.result) {
         try {
+          logger.info(`[POLLING] Got update: ${JSON.stringify({update_id: update.update_id, type: update.message ? 'message' : update.callback_query ? 'callback' : 'other'})}`);
+          logger.debug(`[POLLING] Calling updateHandler for update ${update.update_id}`);
           await updateHandler(update);
+          logger.debug(`[POLLING] updateHandler completed for update ${update.update_id}`);
           offset = update.update_id + 1;
         } catch (error) {
           logger.error(`Error processing update ${update.update_id}`, error);
@@ -47,13 +61,21 @@ async function startPolling(client, updateHandler, options = {}) {
       }
       
       // Reset backoff on successful polling
+      if (response.result.length === 0) {
+        logger.debug(`[POLLING] No updates received (offset: ${offset})`);
+      } else {
+        logger.info(`[POLLING] Processed ${response.result.length} update(s)`);
+      }
       backoffMultiplier = 1;
+      
+      logger.debug(`[POLLING] Waiting for next poll iteration`);
       
       // Wait before next poll
       if (response.result.length === 0) {
         logger.debug(`No updates, waiting ${pollInterval}ms before next poll`);
         await sleep(pollInterval);
       }
+      logger.debug(`[POLLING] Loop iteration complete, restarting...`);
       
     } catch (error) {
       logger.error('Polling error', error);
