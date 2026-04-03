@@ -11,7 +11,7 @@ module.exports.run = async function(runner) {
       answerCallbackQuery: async (id) => { answerCb = id; }
     };
     const config = { telegram: { adminUsername: 'admin' }, ai: { availableModels: [] } };
-    const handler = new CommandHandler(fakeClient, config, {}, null, null, null, null, null, { watchPlugins: false });
+    const handler = new CommandHandler(fakeClient, config, {}, null, null, null, null,  null, null, { watchPlugins: false });
     // Test sending the form
     await handler.handle({ chatId: 42, text: '/formdemo' });
     runner.assert(sentMsg && sentMsg.msg.includes('favorite color'), 'Should send form question');
@@ -35,7 +35,7 @@ module.exports.run = async function(runner) {
       const config = { dataDir: path.join(__dirname, '../../data'), ai: { defaultModel: 'gpt' }, telegram: { adminUsername: 'admin' } };
       let sentMsg = '';
       const fakeClient = { sendMessage: async (chatId, msg) => { sentMsg = msg; }, sendChatAction: async () => {} };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null,  null, null, { watchPlugins: false });
       // Patch settings dir for this test
       handler.config.dataDir = path.join(__dirname, '../../data');
       // Clean up file
@@ -89,7 +89,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: version };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null,  null, null, { watchPlugins: false });
       // Simulate admin user
       await handler.handle({ message: { text: '/sh echo test', from: { id: 1, username: 'admin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('test'), 'Should return shell output for /sh as admin');
@@ -110,7 +110,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { projectRoot: process.cwd(), security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: version };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null,  null, null, { watchPlugins: false });
       // Mock execFile to avoid actually running PowerShell
       handler.execFile = (cmd, args, opts, cb) => cb(null, 'OK', '');
 
@@ -126,7 +126,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: version };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null,  null, null, { watchPlugins: false });
       // Simulate non-admin user
       await handler.handle({ message: { text: '/sh echo test', from: { id: 2, username: 'notadmin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('restricted'), 'Should return admin error for /sh as non-admin');
@@ -145,7 +145,7 @@ module.exports.run = async function(runner) {
             update: async (data) => { if (data.goals) internalGoals = data.goals; }
         };
         const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: version };
-        const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, mockNotepadStore, { watchPlugins: false });
+        const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, mockNotepadStore, null, { watchPlugins: false });
         await handler.handle({ message: { text: '/agent hello world', from: { id: 1, username: 'admin' }, chat: { id: 1 } } });
         runner.assert(sentMessage && sentMessage.includes('Goal added'), 'Should confirm goal added');
         runner.assert(internalGoals.includes('hello world'), 'Goal should be stored in notepad');
@@ -157,7 +157,7 @@ module.exports.run = async function(runner) {
         sendChatAction: async () => {}
       };
       const config = { security: { shCommandWhitelist: ['echo'] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: ['gpt'] }, version: version };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null,  null, null, { watchPlugins: false });
       await handler.handle({ message: { text: '/agent hello world', from: { id: 2, username: 'notadmin' }, chat: { id: 1 } } });
       runner.assert(sentMessage && sentMessage.includes('restricted'), 'Should return admin error for /agent as non-admin');
     });
@@ -168,7 +168,7 @@ module.exports.run = async function(runner) {
     const mockLogger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
     const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
     const mockClient = { sendMessage: async () => {}, sendChatAction: async () => {} };
-    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null, null, { watchPlugins: false });
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null,  null, null, { watchPlugins: false });
     handler.registerPublicCommand('test', () => { called = true; });
     await handler.handle({ message: { text: '/test', from: { id: 1 }, chat: { id: 1 } } });
     runner.assert(called, 'Handler should be called for /test');
@@ -180,7 +180,7 @@ module.exports.run = async function(runner) {
     const mockLogger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
     const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
     const mockClient = { sendMessage: async () => {}, sendChatAction: async () => {} };
-    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null, null, { watchPlugins: false });
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null,  null, null, { watchPlugins: false });
     handler.registerAdminCommand('admin', () => { called = true; });
     // Simulate admin user
     await handler.handle({ message: { text: '/admin', from: { id: 42, username: 'admin' }, chat: { id: 1 } } });
@@ -194,7 +194,7 @@ module.exports.run = async function(runner) {
     const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
     let sentMsg = null;
     const mockClient = { sendMessage: async (chatId, msg) => { sentMsg = msg; }, sendChatAction: async () => {} };
-    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null, null, { watchPlugins: false });
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null,  null, null, { watchPlugins: false });
     
     await handler.handle({ message: { text: '/unknown', from: { id: 1, username: 'user' }, chat: { id: 1 } } });
     
@@ -220,7 +220,7 @@ module.exports.run = async function(runner) {
     };
 
     const config = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] }, version: '1.0.0' };
-    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false, pluginDir: tmpDir });
+    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, null, { watchPlugins: false, pluginDir: tmpDir });
 
     // Load plugins manually (watcher disabled)
     handler.loadPlugins();
@@ -241,7 +241,7 @@ module.exports.run = async function(runner) {
     const mockConfig = { telegram: { adminUsername: 'admin', adminChatId: 123 }, ai: { availableModels: ['gpt'] }, security: { shCommandWhitelist: [] } };
     let sentMsg = null;
     const mockClient = { sendMessage: async (chatId, msg) => { sentMsg = msg; }, sendChatAction: async () => {} };
-    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null, null, { watchPlugins: false });
+    const handler = new CommandHandler(mockClient, mockConfig, mockLogger, null, null, null, null,  null, null, { watchPlugins: false });
     
     // Register a command that throws an error
     handler.registerPublicCommand('error', () => { throw new Error('Boom'); });
@@ -259,7 +259,7 @@ module.exports.run = async function(runner) {
       const config = { security: { shCommandWhitelist: [] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: [] }, version: '1.0.0' };
       const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
       
-      const handler = new CommandHandler(mockClient, config, logger, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(mockClient, config, logger, null, null, null, null,  null, null, { watchPlugins: false });
       
       // Inject bot info
       handler.setBotInfo({ id: 999, username: 'TestBot' });
@@ -290,7 +290,7 @@ module.exports.run = async function(runner) {
       const config = { security: { shCommandWhitelist: [] }, telegram: { adminUsername: 'admin' }, ai: { availableModels: [] }, version: '1.0.0' };
       const logger = { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} };
       
-      const handler = new CommandHandler(mockClient, config, logger, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(mockClient, config, logger, null, null, null, null,  null, null, { watchPlugins: false });
       handler.setBotInfo({ id: 999, username: 'TestBot' });
       handler.handleAsk = async (context) => {
         handledArgs = context.args;
@@ -320,7 +320,7 @@ module.exports.run = async function(runner) {
       const config = { dataDir: path.join(__dirname, '../../data'), ai: { defaultModel: 'gpt' }, telegram: { adminUsername: 'admin' } };
       let sentMsgs = [];
       const fakeClient = { sendMessage: async (chatId, msg) => { sentMsgs.push(msg); }, sendChatAction: async () => {} };
-      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null, null, { watchPlugins: false });
+      const handler = new CommandHandler(fakeClient, config, { info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{} }, null, null, null, null,  null, null, { watchPlugins: false });
       // Clean up any persistent file
       const filePath = path.join(config.dataDir, 'history', userId + '.json');
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

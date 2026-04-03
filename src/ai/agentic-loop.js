@@ -4,7 +4,7 @@ const os = require('os');
 const crypto = require('crypto'); // Need crypto for reminder IDs
 
 class AgenticLoop {
-    constructor({ logger, telegramApiClient, adminChatId, fallbackChain, historyStore, notepadStore, reminderStore }) {
+    constructor({ logger, telegramApiClient, adminChatId, fallbackChain, historyStore, notepadStore, reminderStore, memoryGraph }) {
         this.logger = logger;
         this.telegramApiClient = telegramApiClient;
         this.adminChatId = adminChatId;
@@ -12,6 +12,7 @@ class AgenticLoop {
         this.historyStore = historyStore;
         this.notepadStore = notepadStore;
         this.reminderStore = reminderStore;
+        this.memoryGraph = memoryGraph; // Add per-user semantic memory with Q&A pairs
 
         // Optional profiling settings
         // When enabled, AgenticLoop logs periodic memory/cpu usage for long-running runs.
@@ -103,10 +104,38 @@ class AgenticLoop {
         
         const systemContext = await this.getSystemContext();
 
+        // Load relevant memory graph context (Q&A pairs for admin user)
+        let memoryContext = '';
+        if (this.memoryGraph && this.adminChatId) {
+            try {
+                // Retrieve recent Q&A pairs to inform agent decisions
+                const relevantQAs = this.memoryGraph.getAllQAPairs(this.adminChatId);
+                const recentQAs = relevantQAs.slice(-5); // Get last 5 Q&A pairs
+                
+                if (recentQAs.length > 0) {
+                    memoryContext = '\nRecent Q&A Memory (semantic context):\n';
+                    recentQAs.forEach((qa, idx) => {
+                        const qTrunc = qa.question.length > 100 ? qa.question.slice(0, 100) + '...' : qa.question;
+                        const aTrunc = qa.answer.length > 100 ? qa.answer.slice(0, 100) + '...' : qa.answer;
+                        memoryContext += `  Q${idx + 1}: ${qTrunc}\n  A${idx + 1}: ${aTrunc}\n`;
+                    });
+                }
+
+                // Optionally load memory graph stats for awareness
+                const stats = this.memoryGraph.getStats();
+                if (stats.totalQAPairs > 0) {
+                    memoryContext += `\nMemory Graph Stats: ${stats.totalQAPairs} total Q&A pairs across ${stats.usersWithMemory} users\n`;
+                }
+            } catch (err) {
+                if (this.logger) this.logger.warn('Failed to load memory graph context:', err);
+            }
+        }
+
         const prompt = `You are an advanced, autonomous AI agent inside a Telegram Bot.
 You run a continuous evaluation loop where you formulate goals, check constraints, and can query the environment or users.
 Current system context: ${JSON.stringify(systemContext)}
 Your current internal notepad: ${JSON.stringify(notepad)}
+${memoryContext}
 
 Self-Reflection & Task Breakdown:
 If you are given an ambiguous goal, you must use your notepad to break down the task into smaller sub-tasks.
@@ -172,8 +201,22 @@ Respond strictly in JSON format matching this schema:
             if (this.logger) this.logger.error('AgenticLoop evaluation failed:', err);
         }
     }
-}
 
-module.exports = AgenticLoop;
+    /**
+     * Store a Q&A pair in the memory graph (called from /ask handler)
+     * Enables persistent semantic memory for multi-turn reasoning
+     */
+    async storeQAPair(chatId, question, answer, context = {}) {
+        if (!this.memoryGraph || !chatId) return;
+
+        try {
+            this.memoryGraph.addQAPair(chatId, question, answer, context);
+            this.memoryGraph.save();
+            if (this.logger) this.logger.debug(`Stored Q&A pair for user ${chatId} in memory graph`);
+        } catch (err) {
+            if (this.logger) this.logger.warn(`Failed to store Q&A pair in memory graph: ${err.message}`);
+        }
+    }
+}
 
 module.exports = AgenticLoop;

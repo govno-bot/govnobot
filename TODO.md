@@ -1,6 +1,6 @@
 # 🚀 GovnoBot: A Roadmap to Slightly Less Inevitable Doom 🚀
 
-**Last Updated:** 2026-04-02
+**Last Updated:** 2026-03-05
 
 This document outlines the path forward for GovnoBot. The core is stable, but the future is a minefield of complexity, user abuse, and technical debt. This roadmap acknowledges the crushing reality of software development and attempts to navigate it with a healthy dose of paranoid pessimism.
 
@@ -15,76 +15,6 @@ A brief, futile acknowledgment of past efforts. A stable foundation built on TDD
 - **Command & Docs:** A full suite of commands and comprehensive documentation exist.
 
 **Test Status:** 27 files, 200+ assertions. ✅ All Passing. A brief respite before the chaos.
-
----
-
-## 🔥 Immediate Post-v1.10.7 Priorities 🔥
-
-*Hotfix ticket v1.10.7 resolved command routing issues. These tasks build on that foundation.*
-
-### Agent Context Awareness (High Priority)
-
--   [ ] **Enhance /ask command to be agent-aware:**
-    -   **Task 1:** Modify `handleAsk()` to inject notepad context (user's goals, thoughts, planned actions) into AI prompt
-    -   **Task 2:** Add history awareness: include last 5-10 conversation messages as context window to chain.call()
-    -   **Task 3:** Surface reminder store state to /ask handlers (pending reminders for user)
-    -   **Task 4:** Implement per-user memory/state tracking separate from ephemeral sessions
-    -   **Task 5:** Add `/context` command to show current prompt context for debugging
-    -   **Acceptance Criteria:** /ask responses reference user's notepad, previous messages, and pending items
-
--   [ ] **Create unified agent context builder:**
-    -   **Task 1:** Extract context-building logic into `src/ai/context-builder.js`
-    -   **Task 2:** Context builder should aggregate: history, notepad, reminders, user settings, system state
-    -   **Task 3:** Implement context size limits (prevent exceeding AI token windows)
-    -   **Task 4:** Add context caching (invalidate on notepad/reminder changes)
-    -   **Acceptance Criteria:** All commands and agents use consistent context format; can measure token usage
-
-### Logging Improvements & Clutter Reduction (High Priority)
-
--   [ ] **Implement structured logging levels:**
-    -   **Task 1:** Convert debug-level polling logs to sampling (log 1 in N iterations instead of every one)
-    -   **Task 2:** Create a `logger.verbose()` level for AgenticLoop profiling stats (opt-in via env var)
-    -   **Task 3:** Reduce reminder check logs from DEBUG to TRACE level (create trace if not exists)
-    -   **Task 4:** Add log filtering config: allow disabling/enabling specific log sources
-    -   **Acceptance Criteria:** Default log output is 50% less verbose; no loss of critical info
-
--   [ ] **Implement log aggregation and filtering:**
-    -   **Task 1:** Create `LogFilter` class to suppress repeated logs from same source
-    -   **Task 2:** Add `/logs filter <source> <level>` admin command for runtime filtering
-    -   **Task 3:** Implement log rotation (keep last N lines in bot.log, archive older logs)
-    -   **Task 4:** Add `[SKIP: 50 identical logs]` markers instead of spamming the same line
-    -   **Acceptance Criteria:** Logs remain useful for debugging but aren't overwhelming
-
--   [ ] **Cleanup debug/temporary logging added in v1.10.7:**
-    -   **Task 1:** Review all `[DIAGNOSTIC]`, `[POLLING]`, `[HANDLEUPDATE]` prefixed logs
-    -   **Task 2:** Move verbose ones to DEBUG or TRACE level
-    -   **Task 3:** Keep critical ones (command received, error, handler completion) at INFO
-    -   **Task 4:** Test that logs still catch the v1.10.7 issues (rate limiting, timeouts, etc.)
-    -   **Acceptance Criteria:** Can still debug v1.10.7 fixes from INFO logs; no [DIAGNOSTIC] on happy path
-
-### Test Suite Improvements (Medium Priority)
-
--   [ ] **Implement test cleanup and lifecycle management:**
-    -   **Task 1:** Create `test/helpers/test-cleanup.js` with standard teardown functions
-    -   **Task 2:** Ensure all tests delete created files in `data/` directory (history, settings, etc.)
-    -   **Task 3:** Ensure lock files are removed after each test
-    -   **Task 4:** Implement test cleanup tracking: log which tests left files behind
-    -   **Task 5:** Add pre-test and post-test hooks to verify clean state
-    -   **Acceptance Criteria:** Running test suite twice in a row produces identical logs; no file leaks
-
--   [ ] **Isolate test data directories:**
-    -   **Task 1:** Create per-test directory under `data/test-runs/{testName}_${uuid}/`
-    -   **Task 2:** Update all test stores/configs to use isolated dirs
-    -   **Task 3:** Implement cleanup function that removes test-runs/ after suite passes
-    -   **Task 4:** Ensure parallel tests don't share data
-    -   **Acceptance Criteria:** Tests can run in parallel without interference; no cross-test pollution
-
--   [ ] **Add test health checks:**
-    -   **Task 1:** Create test that verifies no files exist in data/ after full suite
-    -   **Task 2:** Test that lock file doesn't exist after suite
-    -   **Task 3:** Test that bot can start cleanly after running full test suite
-    -   **Task 4:** Add metrics: count of tests that created/left files
-    -   **Acceptance Criteria:** Test suite reports: "✅ 27 tests passed, 0 files leaked"
 
 ---
 

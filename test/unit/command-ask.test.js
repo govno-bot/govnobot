@@ -39,7 +39,7 @@ module.exports.run = async function(runner) {
           telegram: {},
           security: {}
       };
-      const handler = new (require('../../src/commands/command-handler'))(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+      const handler = new (require('../../src/commands/command-handler'))(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{}, warn:()=>{} }, {}, fakeChain, null, null, null, null);
       await handler.handleAsk({
           chatId: 123,
           args: ['stream', 'please'],
@@ -78,7 +78,7 @@ module.exports.run = async function(runner) {
           telegram: {},
           security: {}
       };
-      const handler = new (require('../../src/commands/command-handler'))(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+      const handler = new (require('../../src/commands/command-handler'))(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{}, warn:()=>{} }, {}, fakeChain, null, null, null, null);
       await handler.handleAsk({
           chatId: 123,
           args: ['abort', 'test'],
@@ -116,7 +116,7 @@ module.exports.run = async function(runner) {
         telegram: {}, 
         security: {} 
     };
-    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{}, warn:()=>{} }, {}, fakeChain, null, null, null, null);
     // Call ask
     await handler.handleAsk({ 
         chatId: 123, 
@@ -149,7 +149,7 @@ module.exports.run = async function(runner) {
         telegram: {}, 
         security: {} 
     };
-    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{}, warn:()=>{} }, {}, fakeChain, null, null, null, null);
     
     await handler.handleAsk({ 
         chatId: 123, 
@@ -180,15 +180,15 @@ module.exports.run = async function(runner) {
         telegram: {}, 
         security: {} 
     };
-    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{} }, {}, fakeChain);
+    const handler = new CommandHandler(fakeClient, config, { info:()=>{}, debug:()=>{}, error:()=>{}, warn:()=>{} }, {}, fakeChain, null, null, null, null);
     
     await handler.handleAsk({ 
         chatId: 123, 
         args: ['Error'],
         command: 'ask'
     });
-
-    runner.assert(sentMessages.some(m => m.includes('Sorry') || m.includes('error')), 'Should send friendly error message');
+    console.log('Sent messages:', sentMessages);
+    runner.assert(sentMessages.some(m => m.includes('timed out') || m.includes('error')), 'Should send friendly error message');
     cleanup();
   });
 };

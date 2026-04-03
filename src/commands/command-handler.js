@@ -27,7 +27,7 @@ const { fetchWikipediaSummary, searchWikipedia, fetchWikipediaSection, fetchWiki
  */
 
 class CommandHandler {
-  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore, notepadStore, options = {}) {
+  constructor(client, config, logger, rateLimiter, fallbackChain, auditLogger, reminderStore, notepadStore, memoryGraph, options = {}) {
     this.client = client;
     this.config = config;
     this.logger = logger;
@@ -36,6 +36,7 @@ class CommandHandler {
     this.auditLogger = auditLogger;
     this.reminderStore = reminderStore;
     this.notepadStore = notepadStore;
+    this.memoryGraph = memoryGraph; // Add per-user semantic memory with Q&A pairs
     this.botInfo = null;
     // Command registries
     this.publicCommands = {};
@@ -697,7 +698,137 @@ class CommandHandler {
         return;
       }
 
-      const inputForChain = [{ role: 'user', content: prompt }];
+      // ===== Agent Context Injection =====
+      // Load user context: settings, conversation history, notepad, memory graph
+      const dataDir = (this.config && this.config.data && this.config.data.dir) || this.config.dataDir || '.';
+      let systemPrompt = '';
+      let userSettings = {}; // Define outside promise scope so it's accessible for Q&A storage
+      
+      // Wrap context loading in a timeout to prevent hanging
+      const CONTEXT_LOAD_TIMEOUT = 3000; // 3 seconds max
+      await Promise.race([
+        (async () => {
+          try {
+            // Skip context loading if config is minimal (likely test environment)
+            if (!this.config.data && !this.config.dataDir && (!this.config.settings)) {
+              return;
+            }
+
+            // Load user settings
+            const settingsDir = path.join(dataDir, 'settings');
+            const settingsStore = new SettingsStore(chatId, settingsDir, this.ephemeralSessions[chatId]);
+            userSettings = await settingsStore.load();
+            if (this.logger && this.logger.debug) this.logger.debug(`Loaded settings for chatId ${chatId}:`, userSettings);
+
+            // Load recent conversation history (last 5 messages for context)
+            const historyDir = path.join(dataDir, 'history');
+            const historyStore = new HistoryStore(historyDir, this.ephemeralSessions[chatId]);
+            const recentHistory = await historyStore.loadHistory(chatId, 5);
+            if (this.logger && this.logger.debug) this.logger.debug(`Loaded ${recentHistory.length} recent messages for chatId ${chatId}`);
+
+            // Load user's notepad (thoughts, goals, planned actions)
+            let notepadData = null;
+            if (this.notepadStore && typeof this.notepadStore.load === 'function') {
+              notepadData = await this.notepadStore.load();
+              if (this.logger && this.logger.debug) this.logger.debug(`Loaded notepad for chatId ${chatId}`);
+            }
+
+            // Build system prompt with context
+            const contextBits = [];
+            
+            // Add base system prompt from user settings
+            if (userSettings.systemPrompt) {
+              contextBits.push(`System Instruction: ${userSettings.systemPrompt}`);
+            }
+            
+            // Add user preferences
+            if (userSettings.model) {
+              contextBits.push(`User's preferred model: ${userSettings.model}`);
+            }
+            if (userSettings.language) {
+              contextBits.push(`User's language preference: ${userSettings.language}`);
+            }
+            if (userSettings.verbosity) {
+              contextBits.push(`User's verbosity preference: ${userSettings.verbosity}`);
+            }
+
+            // Add recent conversation context (if any)
+            if (recentHistory && recentHistory.length > 0) {
+              contextBits.push('\nRecent conversation context:');
+              recentHistory.forEach(msg => {
+                const role = msg.role || 'unknown';
+                const content = msg.content || '';
+                const truncated = content.length > 200 ? content.slice(0, 200) + '...' : content;
+                contextBits.push(`  ${role}: ${truncated}`);
+              });
+            }
+
+            // Add notepad context (bot's internal state)
+            if (notepadData) {
+              const notepadBits = [];
+              if (notepadData.thoughts && notepadData.thoughts.trim()) {
+                notepadBits.push(`Bot's thoughts: ${notepadData.thoughts}`);
+              }
+              if (notepadData.goals && Array.isArray(notepadData.goals) && notepadData.goals.length > 0) {
+                notepadBits.push(`Bot's current goals: ${notepadData.goals.join(', ')}`);
+              }
+              if (notepadData.planned_actions && Array.isArray(notepadData.planned_actions) && notepadData.planned_actions.length > 0) {
+                notepadBits.push(`Bot's planned actions: ${notepadData.planned_actions.join(', ')}`);
+              }
+              if (notepadData.notes && notepadData.notes.trim()) {
+                notepadBits.push(`Bot's notes: ${notepadData.notes}`);
+              }
+              if (notepadBits.length > 0) {
+                contextBits.push('\nInternal state (Notepad):');
+                contextBits.push(notepadBits.join('\n'));
+              }
+            }
+
+            // Add semantic memory context from MemoryGraph (relevant Q&A pairs)
+            if (this.memoryGraph && chatId) {
+              try {
+                // Retrieve Q&A pairs similar to the current prompt
+                const relevantQAs = this.memoryGraph.retrieveSimilarQAPairs(chatId, prompt, 3);
+                if (relevantQAs && relevantQAs.length > 0) {
+                  contextBits.push('\nSemantic Memory (Similar Q&A from past interactions):');
+                  relevantQAs.forEach((qa, idx) => {
+                    const qTrunc = qa.question.length > 150 ? qa.question.slice(0, 150) + '...' : qa.question;
+                    const aTrunc = qa.answer.length > 150 ? qa.answer.slice(0, 150) + '...' : qa.answer;
+                    contextBits.push(`  Similar Q${idx + 1}: ${qTrunc}`);
+                    contextBits.push(`  Previous A${idx + 1}: ${aTrunc}`);
+                  });
+                }
+              } catch (memErr) {
+                if (this.logger && this.logger.debug) {
+                  this.logger.debug(`Failed to load memory graph context: ${memErr.message}`);
+                }
+              }
+            }
+
+            // Construct the full system prompt
+            if (contextBits.length > 0) {
+              systemPrompt = contextBits.join('\n');
+            }
+
+            if (this.logger && this.logger.debug) {
+              this.logger.debug(`Built system prompt for context injection: ${systemPrompt.length} chars`);
+            }
+          } catch (contextErr) {
+            // Log context loading errors but don't fail the /ask command
+            if (this.logger && this.logger.warn) {
+              this.logger.warn(`Failed to load context for /ask: ${contextErr.message}`);
+            }
+          }
+        })(),
+        new Promise((resolve) => setTimeout(resolve, CONTEXT_LOAD_TIMEOUT))
+      ]);
+
+      // Build input for chain with system prompt + user message
+      const inputForChain = [];
+      if (systemPrompt) {
+        inputForChain.push({ role: 'system', content: systemPrompt });
+      }
+      inputForChain.push({ role: 'user', content: prompt });
       
       // Add timeout to chain.call() to prevent polling loop from hanging
       const AI_TIMEOUT = 60000; // 60 second timeout for AI responses
@@ -763,6 +894,25 @@ class CommandHandler {
               await this.client.sendMessage(chatId, c);
             }
             await historyStore.addMessage(chatId, 'assistant', assistantText);
+          }
+
+          // Store Q&A pair in MemoryGraph for persistent semantic memory
+          if (this.memoryGraph && chatId && prompt && assistantText) {
+            try {
+              this.memoryGraph.addQAPair(chatId, prompt, assistantText, {
+                timestamp: Date.now(),
+                model: userSettings?.model || 'unknown',
+                source: 'ask_command'
+              });
+              this.memoryGraph.save();
+              if (this.logger && this.logger.debug) {
+                this.logger.debug(`Stored Q&A pair in MemoryGraph for user ${chatId}`);
+              }
+            } catch (memErr) {
+              if (this.logger && this.logger.warn) {
+                this.logger.warn(`Failed to store Q&A pair in MemoryGraph: ${memErr.message}`);
+              }
+            }
           }
         }
       } catch (err) {

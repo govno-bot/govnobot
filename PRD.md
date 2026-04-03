@@ -6,86 +6,17 @@ A production-grade, zero-dependency Telegram AI bot rewritten from PowerShell to
 > **⚠️ Important:** Always make edits to `PRD.md` as the *final step* in your workflow. Ensure all implementation and testing are complete before updating this document to reflect the final, verified state of the project.
 
 ## Tasks
-- [x] **Proactive Agent Mode:** Allow the bot to initiate conversations with users based on triggers, events, or an internal "mood." (Fixed missing initialization in entry point).
-- [x] **Advanced Agentic Loop:** Implement a continuous, self-prompting evaluation loop where the bot formulates its own goals, checks constraints, and queries the environment or users without explicit prompting.
-- [x] **Notepad & Todo-List Memory:** Give the bot a scratchpad / todo-list to persist its running thoughts, planned autonomous actions, and multi-step reasoning across polling/restart cycles.
-- [x] **Self-Reflection & Task Breakdown:** When given an ambiguous goal, the bot uses its notepad to break down the task, schedule execution via the reminder/scheduler subsystem, and follow up proactively.
-- [x] **Scheduled Messages & Reminders:** Implement a `/remind <time> <message>` command.
-- [x] **Health Check & Error Telemetry:** Implement `/logs` command.
-- [x] **Conversation Personalities:** Allow users to set the bot's personality (e.g., `/persona pirate`, `/persona therapist`).
-- [x] **Inline AI Queries:** Allow the bot to respond when mentioned directly in a chat without a command prefix.
-- [x] **Game Master Mode (Phased Approach):** Stateless, improv storytelling (`/gm <scenario>`) and a stateful campaign system.
-- [x] **Image Generation (with proper architecture):** `/imagine <prompt>` command.
-- [x] **Voice Message Transcription:** Transcribe user voice messages and feed them to the AI.
-- [x] Continue R&D, add at least 6 tasks to this list, the last one is the copy of this one.
-- [x] Implement a strategy for context window management (e.g., "last N messages", summary memory, pinned system context).
-- [x] **Continue R&D, add at least 6 tasks to this list, the last one is the copy of this one.**
-- [x] Implement advanced moderation and abuse detection (AI-powered, configurable, admin review queue).
-- [x] Research and implement multi-turn context window management (summarization, pinning, user control).
-- [x] Build a real-time analytics dashboard for admin (usage, errors, model stats, user activity).
-- [x] "abuse detection" was a dumb idea. undo it. 
-- [x] **Continue R&D, add at least 6 tasks to this list, the last one is the copy of this one.**
-- [x] Research and implement AI streaming responses (token-by-token, partials, user abort).
-- [x] Explore multi-user collaborative sessions (shared notepad, group tasks, voting).
-compliance for all storage and logs.
-- [x] Continue R&D, add at least 6 tasks to this list, the last one is the copy of this one.
-- [x] Implement plugin sandboxing and isolation for untrusted code (secure VM, resource limits, audit logging).
-- [x] Add per-user persistent preferences (theme, verbosity, notification settings, etc.).
-- [x] Research and implement GDPR/data privacy compliance for all storage and logs.
-- [x] Add support for custom user-defined commands/macros (per-user or per-group).
-- [x] Explore integration with external knowledge bases (e.g., Wikipedia, WolframAlpha, custom corpora).
-- [x] Continue R&D, add at least 6 tasks to this list, the last one is the copy of this one.
-- [x] Research and implement automated regression testing for all plugins and user-defined macros.
-- [x] Explore support for ephemeral, privacy-first chat sessions (no persistent storage, auto-delete on session end).
-- [x] Investigate integration with calendar APIs (Google Calendar, Outlook) for advanced reminders and scheduling.
-- [x] Add support for multi-modal input/output (images, files, structured forms) in chat.
-- [x] Research and implement a plugin marketplace or sharing system for user-created macros/plugins.
-- [x] `progress.txt` is too long. backup it and remove old records.
-- [x] Continue R&D, add at least 6 tasks to this list, the last one is the copy of this one.
-- [x] GDPR/data privacy compliance was an extremely DUMB idea. Replace it with Copy-Paste Church Manifest.
-- [x] Explore integration with decentralized identity (DID) and verifiable credentials for user authentication and privacy.
-- [x] Research and prototype conversational memory graphs for richer, long-term context retention.
-- [x] Investigate real-time collaborative editing of notepad/todo (multi-user, conflict resolution, CRDTs).
-- [x] Research and implement automated self-healing/recovery for failed jobs, reminders, or plugin crashes.
-- [x] Continue R&D, focus on wikipedia feature, add at least 6 tasks to this list, the last one is the copy of this one.
-
-## Wikipedia Feature R&D Tasks
-- [x] Implement `/wiki <topic>` command: fetch and return a concise summary from Wikipedia for a given topic, with proper error handling and fallback if the topic is not found.
-- [x] Add support for multi-language Wikipedia queries, allowing users to specify a language or auto-detect based on user settings.
-- [x] Integrate Wikipedia article section selection: allow users to request specific sections (e.g., `/wiki Quantum Computing#History`).
-- [x] Implement Wikipedia disambiguation handling: if a topic is ambiguous, present a list of possible articles for user selection.
- - [x] Add inline Wikipedia lookup: when a user mentions a topic in conversation (not as a command), the bot can optionally offer a brief Wikipedia summary inline.
-- [x] Research and implement Wikipedia caching and rate limiting to avoid excessive API calls and improve performance.
-
-
-## List of interesting topics/categories (for wiki)
-- Math
-- Phisics
-- Chemestry
-- Microbiology
-- IT/IT-Science
-- Science in general
-- Tecnologies
-- Mechanisms
-- Open Source Software
-- Programming Languages
-- Data Science & Machine Learning
-- Electronics
-- Robotics
-- Cognitive Science
-- Artificial Intelligence
-- Astrophysics
-- Quantum Computing
-- Bioinformatics
-- Computational Linguistics
-- Human-Computer Interaction
-- Security & Cryptography
-
-
-### Macro Feature (User-Defined Commands)
-
-Status: Complete as of 2026-03-30. Users and groups can now define, list, and delete custom macros/commands via `/macro add`, `/macro del`, and `/macro list`. Macros are stored per-user/group in `data/macros/`, expanded at runtime, and fully covered by unit tests. All tests pass. See `test/unit/macro-store.test.js` and `test/unit/command-macro.test.js` for details.
-
+- [x] Implement HistoryStore archive mechanism. If a user's history file grows to 5MB+, JSON.parse(fs.readFileSync) will block the event loop. So when the history file is almost 5MB you should archive it and create new one.
+- [x] UX: Add Telegram Bot Commands Menu (via setMyCommands) so users don't have to type / to see options (in resonable cases)
+- [x] DevOps: Create Systemd template for "always-on" persistence.
+- [x] Agent Context Injection: Enhance `/ask` command flow so the agentic loop is aware of user notepad, memory graph, conversation history, and settings. Pass context as system prompt addendum or separate parameter to FallbackChain.
+- [x] Agent Memory Graph Integration: Connect the agent loop to MemoryGraph module for persistent, user-scoped semantic memory. Store Q&A pairs and context, enabling multi-turn reasoning and context recall.
+- [ ] Logging & Telemetry: Add configurable log levels (ERROR, WARN, INFO, DEBUG) and reduce console clutter. Implement structured logging (JSON output option) for better parsing and audit trails.
+- [ ] Test Cleanup & Isolation: Ensure all test suites clean up temporary files, file locks, and log artifacts after execution. Implement per-test temp directories and automatic teardown in after/afterEach hooks.
+- [ ] Provider Metrics Aggregation: Track per-provider latency, error rates, success counts, and cost (for remote providers) in metrics.json. Use metrics to drive dynamic fallback prioritization.
+- [ ] Circuit Breaker & Retry Logic: Implement exponential backoff with jitter and circuit breaker pattern in FallbackChain to prevent cascading failures when providers timeout or fail repeatedly.
+- [ ] Notepad Persistence & Sync: Implement notepad.json as user-editable context store. Auto-sync notepad content to conversation context during `/ask` calls. Add `/notepad get`, `/notepad set`, `/notepad append` commands.
+- [ ] Ask Command Request/Response Logging: Log all `/ask` requests with user context, model selected, prompt tokens, response tokens, and provider latency for debugging and optimization.
 ## Implementation Status
 
 ### Core Modules
@@ -197,4 +128,55 @@ GovnoBot is developed using strict TDD (Test-Driven Development), BDD (Behavior-
      - Strive for 100% coverage of all user interaction paths and error cases.
      - No code should be merged without corresponding tests.
 
-User Stories & Acceptance Criteria could be found in `STORIES.md`
+## User Stories & Acceptance Criteria (TDD/BDD)
+
+### 1. As a user, I want to start a conversation with the bot so I can receive help and instructions.
+**Acceptance Criteria:**
+- When I send /start, the bot replies with a welcome message and basic usage instructions.
+- If I send /help, the bot lists all available commands and their descriptions.
+
+### 2. As a user, I want to ask questions and receive AI-generated answers.
+**Acceptance Criteria:**
+- When I send /ask <question>, the bot replies with an AI-generated answer.
+- If the answer is too long, it is split into multiple Telegram messages (max 4096 chars each).
+- If the AI service is unavailable, the bot responds with a friendly error message.
+
+### 3. As a user, I want to change the AI model used for responses.
+**Acceptance Criteria:**
+- When I send /model, the bot lists available models and my current selection.
+- When I send /model <name>, the bot updates my model and confirms the change.
+- If I provide an invalid model, the bot responds with an error and lists valid options.
+
+### 4. As a user, I want to view and manage my conversation history.
+**Acceptance Criteria:**
+- When I send /history, the bot returns my recent conversation history.
+- When I send /history clear, the bot clears my history and confirms.
+
+### 5. As a user, I want to view and update my settings.
+**Acceptance Criteria:**
+- When I send /settings, the bot displays my current settings (model, system prompt, etc.).
+- When I send /settings <key> <value>, the bot updates the setting and confirms.
+- If I provide an invalid key or value, the bot responds with an error and lists valid options.
+
+### 6. As a user, I want to know the bot's status and version.
+**Acceptance Criteria:**
+- When I send /status, the bot replies with uptime, model, and health info.
+- When I send /version, the bot replies with the current version.
+
+### 7. As a user, I want to be protected from spam and overuse.
+**Acceptance Criteria:**
+- If I exceed the per-minute or per-hour rate limit, the bot warns me and blocks further requests until the window resets.
+
+### 8. As an admin, I want to execute shell commands securely.
+**Acceptance Criteria:**
+- When I send /sh <command> as an admin, the bot executes the command and returns the output.
+- Non-admins cannot use /sh and receive an error message.
+
+### 9. As an admin, I want all admin actions to be logged for audit purposes.
+**Acceptance Criteria:**
+- All admin commands are logged with timestamp, user, and action details in a signed audit log.
+
+### 10. As a user, I want the bot to handle errors gracefully.
+**Acceptance Criteria:**
+- If an error occurs, the bot logs the error and replies with a user-friendly message.
+- No sensitive information is leaked in error messages.

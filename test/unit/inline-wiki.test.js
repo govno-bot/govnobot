@@ -25,7 +25,7 @@ async function runTests() {
     async sendMessage(chatId, text, opts) { this.messages.push({ chatId, text, opts }); }
   };
 
-  const handler = new CommandHandler(mockBot, {}, { error: () => {} }, null, null, null, null, null);
+  const handler = new CommandHandler(mockBot, {}, { error: () => {}, debug: () => {} }, null, null, null, null, null, null);
 
   // Provide ephemeral session settings so SettingsStore.load returns notifications 'all'
   handler.ephemeralSessions[10] = { settings: { notifications: 'all', language: 'en' } };

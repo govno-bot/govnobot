@@ -73,6 +73,7 @@ const NotepadStore = require('./storage/notepad-store');
 const ReminderScheduler = require('./reminder-scheduler');
 const ProactiveAgent = require('./mood/proactive-agent');
 const AgenticLoop = require('./ai/agentic-loop');
+const MemoryGraph = require('./ai/memory-graph');
 
 let logger;
 let config;
@@ -196,6 +197,17 @@ async function initialize() {
     const notepadStore = new NotepadStore(config.data.dir);
     logger.info('✅ Notepad store initialized');
 
+    // Initialize memory graph (user-scoped semantic memory for Q&A pairs)
+    const memoryGraphPath = path.join(config.data.dir, 'memory-graph');
+    const memoryGraph = new MemoryGraph(memoryGraphPath);
+    try {
+      memoryGraph.load();
+      const stats = memoryGraph.getStats();
+      logger.info(`✓ Memory graph loaded: ${stats.totalQAPairs} Q&A pairs for ${stats.usersWithMemory} users`);
+    } catch (err) {
+      logger.warn(`Failed to load memory graph: ${err.message}. Starting fresh.`);
+    }
+
     // Initialize command handler
     commandHandler = new CommandHandler(
       client,
@@ -205,7 +217,8 @@ async function initialize() {
       fallbackChain,
       auditLogger,
       reminderStore,
-      notepadStore
+      notepadStore,
+      memoryGraph
     );
     logger.info('✅ Command handler initialized');
 
@@ -241,6 +254,7 @@ async function initialize() {
       fallbackChain,
       notepadStore,
       reminderStore,
+      memoryGraph,
       historyStore: undefined
     });
     if (config.profiling?.agenticLoopEnabled) {
